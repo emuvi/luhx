@@ -71,6 +71,10 @@ public class Luhx {
      */
     public static void main(String[] args) {
         configureLogging();
+        if (args == null || args.length == 0) {
+            LuhxGUI.launch();
+            return;
+        }
         try {
             run(args);
         } catch (Exception e) {
