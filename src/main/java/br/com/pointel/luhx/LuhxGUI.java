@@ -2,8 +2,10 @@ package br.com.pointel.luhx;
 
 import com.formdev.flatlaf.FlatLightLaf;
 import java.awt.BorderLayout;
+import java.awt.Desktop;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -66,7 +68,7 @@ public class LuhxGUI extends JFrame {
                 if (e.getClickCount() == 2) {
                     int index = list.locationToIndex(e.getPoint());
                     if (index >= 0 && list.getCellBounds(index, index).contains(e.getPoint())) {
-                        startIndexing(model.get(index));
+                        openPath(model.get(index));
                     }
                 }
             }
@@ -213,10 +215,37 @@ public class LuhxGUI extends JFrame {
             lines.add(String.format("[%.4f] %s", r.score(), r.file()));
         }
         JList<String> view = new JList<>(lines.toArray(new String[0]));
+        view.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() == 2) {
+                    int index = view.locationToIndex(e.getPoint());
+                    if (index >= 0 && view.getCellBounds(index, index).contains(e.getPoint())) {
+                        openPath(results.get(index).file());
+                    }
+                }
+            }
+        });
         JScrollPane pane = new JScrollPane(view);
         pane.setPreferredSize(new Dimension(700, 300));
         JOptionPane.showMessageDialog(this, pane, "Results (" + results.size() + ")",
                 JOptionPane.PLAIN_MESSAGE);
+    }
+
+    private void openPath(Path path) {
+        try {
+            if (!Desktop.isDesktopSupported()) {
+                throw new IOException("Opening files is not supported on this system.");
+            }
+            Desktop desktop = Desktop.getDesktop();
+            if (!desktop.isSupported(Desktop.Action.OPEN)) {
+                throw new IOException("Opening files is not supported on this system.");
+            }
+            desktop.open(path.toFile());
+        } catch (IOException | UnsupportedOperationException | SecurityException ex) {
+            JOptionPane.showMessageDialog(this, "Could not open " + path + ": " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
     }
 
     /** Installs the FlatLaf look and feel and shows the window. */
