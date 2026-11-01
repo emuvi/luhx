@@ -177,7 +177,7 @@ public class LuhxGUI extends JFrame {
             JOptionPane.showMessageDialog(this, "Enter search terms.");
             return;
         }
-        if (!java.nio.file.Files.exists(folder.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".mv.db"))) {
+        if (!java.nio.file.Files.exists(folder.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".h2.db"))) {
             JOptionPane.showMessageDialog(this,
                     "Folder not indexed yet. Double-click it to index.");
             return;
