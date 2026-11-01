@@ -16,21 +16,21 @@ for %%T in (java jdeps jlink jpackage mvn) do (
     where %%T >nul 2>&1 || (echo ERROR: %%T not found in PATH.& exit /b 1)
 )
 
-echo [1/6] Cleaning previous intermediates...
+echo [1/7] Cleaning previous intermediates...
 for %%D in ("%INPUT%" "%RUNTIME%" "%APP%") do if exist %%D rmdir /s /q %%D
 if exist "%DIST%\modules.txt" del /q "%DIST%\modules.txt"
 if exist "%DIST%\%NAME%-windows.zip" del /q "%DIST%\%NAME%-windows.zip"
 
-echo [2/6] Building jar and dependencies with Maven...
+echo [2/7] Building jar and dependencies with Maven...
 call mvn -q -B package -DskipTests -Dmaven.javadoc.skip=true
 if errorlevel 1 (echo ERROR: Maven build failed.& exit /b 1)
 
-echo [3/6] Staging jpackage input...
+echo [3/7] Staging jpackage input...
 mkdir "%INPUT%\lib" || exit /b 1
 copy /y "%DIST%\%NAME%.jar" "%INPUT%\" >nul || exit /b 1
 copy /y "%DIST%\lib\*.jar" "%INPUT%\lib\" >nul || exit /b 1
 
-echo [4/6] Detecting required Java modules with jdeps...
+echo [4/7] Detecting required Java modules with jdeps...
 set "MODULES="
 for /f "delims=" %%M in ('jdeps --multi-release 21 --ignore-missing-deps --print-module-deps --class-path "%INPUT%\lib\*" "%INPUT%\%NAME%.jar"') do set "MODULES=%%M"
 if not defined MODULES (echo ERROR: jdeps failed.& exit /b 1)
@@ -39,12 +39,12 @@ set "MODULES=%MODULES%,java.sql,java.naming,java.xml,java.desktop,java.managemen
 echo %MODULES%> "%DIST%\modules.txt"
 echo Modules: %MODULES%
 
-echo [5/6] Creating trimmed Java runtime with jlink...
+echo [5/7] Creating trimmed Java runtime with jlink...
 jlink --add-modules %MODULES% --output "%RUNTIME%" --strip-debug --no-header-files --no-man-pages --compress zip-6
 if errorlevel 1 (echo ERROR: jlink failed.& exit /b 1)
 
-echo [6/6] Creating application image with jpackage...
-jpackage --type app-image --name %NAME% --input "%INPUT%" --main-jar %NAME%.jar --runtime-image "%RUNTIME%" --dest "%APP%" --win-console
+echo [6/7] Creating application image with jpackage...
+jpackage --type app-image --name %NAME% --input "%INPUT%" --main-jar %NAME%.jar --runtime-image "%RUNTIME%" --dest "%APP%" --win-console --icon "%~dp0design\luhx.ico"
 if errorlevel 1 (echo ERROR: jpackage failed.& exit /b 1)
 
 powershell -NoProfile -Command "Compress-Archive -Path '%APP%\%NAME%' -DestinationPath '%DIST%\%NAME%-windows.zip' -Force"
