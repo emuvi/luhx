@@ -98,26 +98,18 @@ public class LuhxGUI extends JFrame {
         if (!indexing.add(folder)) {
             return;
         }
+        IndexMonitor monitor = new IndexMonitor(this, folder);
+        monitor.setVisible(true);
         new SwingWorker<Luhx.IndexStats, Void>() {
             @Override
             protected Luhx.IndexStats doInBackground() throws Exception {
-                return Luhx.indexFolder(folder);
+                return Luhx.indexFolder(folder, monitor);
             }
 
             @Override
             protected void done() {
                 indexing.remove(folder);
-                try {
-                    Luhx.IndexStats s = get();
-                    JOptionPane.showMessageDialog(LuhxGUI.this, String.format(
-                            "Indexing completed at %s%nCreated: %d, Modified: %d, Deleted: %d, Unchanged: %d",
-                            folder, s.created(), s.modified(), s.deleted(), s.unchanged()));
-                } catch (Exception ex) {
-                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    JOptionPane.showMessageDialog(LuhxGUI.this,
-                            "Failed to index " + folder + ": " + cause.getMessage(),
-                            "Error", JOptionPane.ERROR_MESSAGE);
-                }
+                monitor.ended();
             }
         }.execute();
     }
