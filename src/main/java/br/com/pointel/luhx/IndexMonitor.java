@@ -23,6 +23,8 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
     private final JLabel counters = new JLabel("Starting...");
     private final JProgressBar bar = new JProgressBar();
     private final JButton close = new JButton("Close");
+    private final JButton stop = new JButton("Stop");
+    private volatile boolean cancelRequested;
     private int created, modified, deleted, unchanged, failed;
 
     /**
@@ -38,11 +40,17 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
         bar.setIndeterminate(true);
         close.setEnabled(false);
         close.addActionListener(e -> dispose());
+        stop.addActionListener(e -> {
+            cancelRequested = true;
+            stop.setEnabled(false);
+            append("Stopping...");
+        });
 
         JPanel top = new JPanel(new BorderLayout(0, 6));
         top.add(counters, BorderLayout.NORTH);
         top.add(bar, BorderLayout.SOUTH);
         JPanel bottom = new JPanel();
+        bottom.add(stop);
         bottom.add(close);
 
         JPanel content = new JPanel(new BorderLayout(0, 8));
@@ -70,7 +78,18 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
         bar.setIndeterminate(false);
         bar.setValue(bar.getMaximum());
         close.setEnabled(true);
+        stop.setEnabled(false);
         append(message);
+    }
+
+    @Override
+    public boolean isCancelled() {
+        return cancelRequested;
+    }
+
+    @Override
+    public void onCancel(Luhx.IndexStats stats) {
+        SwingUtilities.invokeLater(() -> finished("Stopped by user. Files processed so far were kept in the index."));
     }
 
     @Override
@@ -112,6 +131,7 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
     public void ended() {
         SwingUtilities.invokeLater(() -> {
             bar.setIndeterminate(false);
+            stop.setEnabled(false);
             close.setEnabled(true);
         });
     }

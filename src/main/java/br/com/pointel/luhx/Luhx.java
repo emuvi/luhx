@@ -75,6 +75,12 @@ public class Luhx {
 
         /** Called once after a successful run. */
         default void onFinish(IndexStats stats) {}
+
+        /** Polled between files; return true to stop the run early. */
+        default boolean isCancelled() { return false; }
+
+        /** Called once when the run stopped early; stats cover the files processed so far. */
+        default void onCancel(IndexStats stats) {}
     }
 
     private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
@@ -160,6 +166,7 @@ public class Luhx {
             Set<String> seenPaths = new HashSet<>();
 
             int[] counts = new int[4]; // [0]=created, [1]=modified, [2]=deleted, [3]=unchanged
+            boolean[] cancelled = new boolean[1];
 
             String insertSql = "INSERT INTO DOCUMENTS (FILE_PATH, FILE_NAME, LAST_MODIFIED, FILE_SIZE, CONTENT) VALUES (?, ?, ?, ?, ?)";
             String updateSql = "UPDATE DOCUMENTS SET FILE_NAME = ?, LAST_MODIFIED = ?, FILE_SIZE = ?, CONTENT = ? WHERE ID = ?";
@@ -180,6 +187,10 @@ public class Luhx {
 
                     @Override
                     public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
+                        if (obs.isCancelled()) {
+                            cancelled[0] = true;
+                            return FileVisitResult.TERMINATE;
+                        }
                         File file = filePath.toFile();
                         if (!DocReader.canRead(file)) {
                             return FileVisitResult.CONTINUE;
@@ -227,18 +238,25 @@ public class Luhx {
 
                 });
 
-                for (DocMeta doc : existingDocs.values()) {
-                    if (!seenPaths.contains(doc.filePath())) {
-                        deleteStmt.setLong(1, doc.id());
-                        deleteStmt.executeUpdate();
-                        counts[2]++;
-                        obs.onFile(doc.filePath(), IndexAction.DELETED);
+                // Skipped when cancelled: unseen paths would wrongly look deleted.
+                if (!cancelled[0]) {
+                    for (DocMeta doc : existingDocs.values()) {
+                        if (!seenPaths.contains(doc.filePath())) {
+                            deleteStmt.setLong(1, doc.id());
+                            deleteStmt.executeUpdate();
+                            counts[2]++;
+                            obs.onFile(doc.filePath(), IndexAction.DELETED);
+                        }
                     }
                 }
             }
 
             IndexStats stats = new IndexStats(counts[0], counts[1], counts[2], counts[3]);
-            obs.onFinish(stats);
+            if (cancelled[0]) {
+                obs.onCancel(stats);
+            } else {
+                obs.onFinish(stats);
+            }
             return stats;
         }
     }
