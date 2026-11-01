@@ -1,49 +1,58 @@
 # Luhx
 
-Projeto de exemplo utilizando **H2 Database + Apache Lucene** (`FullTextLucene` / `FTL_INIT`) para indexação incremental e busca textual (Full-Text Search) em arquivos suportados pelo `DocReader` (Textos/Códigos, PDFs e documentos Microsoft Office).
+Luhx is a Java library and command-line application for indexing and searching documents with Apache Lucene and H2. It extracts text from supported text and code files, PDFs, and Microsoft Office documents.
 
-## Compilação
+## Requirements
+
+- Java 21 or later
+- Maven
+
+## Build
 
 ```shell
 mvn clean package
 ```
 
-O JAR executável será gerado em `dist/luhx.jar` (com as dependências em `dist/lib/`).
+The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are copied to `dist/lib/`.
 
-## Uso como biblioteca
+## Command-line usage
 
-O mesmo projeto também disponibiliza a API Java em `br.com.pointel.luhx.Luhx`.
-Use `indexFolder(Path)` para indexar ou atualizar uma pasta e `searchFolder(Path, String...)`
-para recuperar resultados como `SearchResult`, sem imprimir saída no console:
+Both commands take the folder to index or search. The index is stored in a `.luhx` subfolder inside it.
+
+### Create or update an index
+
+```shell
+java -jar dist/luhx.jar --index <folder>
+```
+
+Indexing scans the folder recursively. On subsequent runs, Luhx adds new files, reindexes files whose size or modification time changed, removes entries for deleted files, and leaves unchanged files alone. The command reports counts for each category.
+
+### Search an index
+
+```shell
+java -jar dist/luhx.jar --search <folder> <term> [<term>...]
+```
+
+Run `--index` before searching. Results are ordered by Lucene's BM25 relevance score. When multiple terms are supplied without Boolean operators, they are combined with `AND`.
+
+Examples:
+
+```shell
+java -jar dist/luhx.jar --index ./documents
+java -jar dist/luhx.jar --search ./documents lucene
+java -jar dist/luhx.jar --search ./documents lucene AND indexing
+```
+
+## Use as a library
+
+The public API is `br.com.pointel.luhx.Luhx`. `indexFolder(Path)` indexes or updates a folder and returns `IndexStats`; `searchFolder(Path, String...)` returns matching files as `SearchResult` values without printing to the console.
 
 ```java
-Luhx.IndexStats stats = Luhx.indexFolder(Path.of("documentos"));
-List<Luhx.SearchResult> results = Luhx.searchFolder(Path.of("documentos"), "lucene", "h2");
+import br.com.pointel.luhx.Luhx;
+import java.nio.file.Path;
+import java.util.List;
+
+Luhx.IndexStats stats = Luhx.indexFolder(Path.of("documents"));
+List<Luhx.SearchResult> results =
+        Luhx.searchFolder(Path.of("documents"), "lucene", "h2");
 ```
-
-O mesmo arquivo `Luhx.java` contém o ponto de entrada CLI (`main`) e a API da biblioteca;
-os métodos de parsing e saída do terminal ficam em helpers privados, separados das operações
-de indexação e busca disponibilizadas publicamente.
-
-## Funcionalidades
-
-### 1. Criar ou atualizar o índice de uma pasta (`--index`)
-
-```shell
-java -jar dist/luhx.jar --index <path>
-```
-
-- Lê recursivamente todos os arquivos suportados por `DocReader.canRead(file)` dentro de `<path>`.
-- Salva o banco H2 e o índice invertido do Lucene na própria pasta (dentro de `<path>/.luhx`).
-- Caso o índice já exista, realiza a atualização incremental:
-  - **Criados**: novos arquivos encontrados na pasta são extraídos e inseridos no índice.
-  - **Modificados**: arquivos cuja data de modificação ou tamanho mudaram são reprocessados e atualizados no índice.
-  - **Excluídos**: arquivos que estavam no índice mas foram removidos da pasta são excluídos do índice.
-
-### 2. Pesquisar no índice (`--search`)
-
-```shell
-java -jar dist/luhx.jar --search <path> <keys>...
-```
-
-- Consulta o índice já criado na pasta `<path>` pelas chaves passadas (`<keys>...`) utilizando `FTL_SEARCH_DATA` do H2 + Lucene e imprime na tela os arquivos encontrados ordenados por relevância (BM25 Score).
