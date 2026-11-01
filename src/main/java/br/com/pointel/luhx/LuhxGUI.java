@@ -3,6 +3,7 @@ package br.com.pointel.luhx;
 import com.formdev.flatlaf.FlatLightLaf;
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,17 +40,20 @@ public class LuhxGUI extends JFrame {
 
         JButton add = new JButton("+");
         JButton remove = new JButton("-");
+        JButton index = new JButton("Index");
         JButton search = new JButton("Search");
         add.addActionListener(e -> addFolder());
         remove.addActionListener(e -> removeSelected());
+        index.addActionListener(e -> indexSelected());
         search.addActionListener(e -> search());
         searchField.addActionListener(e -> search());
 
-        JPanel left = new JPanel();
-        left.add(add);
-        left.add(remove);
-        JPanel top = new JPanel(new BorderLayout(8, 0));
-        top.add(left, BorderLayout.WEST);
+        JPanel top = new JPanel(new BorderLayout(4, 0));
+        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        leftButtons.add(add);
+        leftButtons.add(remove);
+        leftButtons.add(index);
+        top.add(leftButtons, BorderLayout.WEST);
         top.add(searchField, BorderLayout.CENTER);
         top.add(search, BorderLayout.EAST);
 
@@ -66,8 +70,8 @@ public class LuhxGUI extends JFrame {
             }
         });
 
-        JPanel content = new JPanel(new BorderLayout(0, 12));
-        content.setBorder(BorderFactory.createEmptyBorder(16, 16, 16, 16));
+        JPanel content = new JPanel(new BorderLayout(0, 4));
+        content.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
         content.add(top, BorderLayout.NORTH);
         content.add(new JScrollPane(list), BorderLayout.CENTER);
         setContentPane(content);
@@ -92,6 +96,15 @@ public class LuhxGUI extends JFrame {
         if (index >= 0) {
             model.remove(index);
         }
+    }
+
+    private void indexSelected() {
+        Path folder = list.getSelectedValue();
+        if (folder == null) {
+            JOptionPane.showMessageDialog(this, "Select a folder from the list.");
+            return;
+        }
+        startIndexing(folder);
     }
 
     private void startIndexing(Path folder) {
