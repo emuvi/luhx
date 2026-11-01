@@ -37,7 +37,7 @@ public class DocReaderTXT {
     }
 
     /**
-     * Extracts the complete text from the file utilizing standard system encodings.
+     * Extracts the complete text from the file using UTF-8.
      *
      * @return the raw string content of the file
      * @throws Exception if an I/O error occurs
@@ -58,7 +58,7 @@ public class DocReaderTXT {
     }
 
     /**
-     * Reads all lines from the file utilizing standard system encodings.
+     * Reads all lines from the file using UTF-8.
      *
      * @return a list containing all lines
      * @throws Exception if an I/O error occurs
@@ -101,9 +101,10 @@ public class DocReaderTXT {
     /**
      * Reads the file and returns a preview of its contents up to the given length.
      *
-     * @param length the maximum number of characters to return
-     * @return a substring of the text
+     * @param length the maximum number of characters to return; must not be negative
+     * @return up to {@code length} characters
      * @throws Exception if an I/O error occurs
+     * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
         String full = read();
@@ -118,7 +119,6 @@ public class DocReaderTXT {
      * Plain text files are not paginated, so this defaults to 1.
      *
      * @return the total page count (1)
-     * @throws Exception if an error occurs
      */
     public Integer countPages() throws Exception {
         return 1;

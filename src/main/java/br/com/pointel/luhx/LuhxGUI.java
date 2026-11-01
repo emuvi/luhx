@@ -16,6 +16,7 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
@@ -31,6 +32,7 @@ import java.awt.event.MouseEvent;
 public class LuhxGUI extends JFrame {
 
     private static final String PATHS_FILE = "paths.ini";
+    private static final int SEARCH_PAGE_SIZE = 50;
 
     private final DefaultListModel<Path> model = new DefaultListModel<>();
     private final JList<Path> list = new JList<>(model);
@@ -189,13 +191,19 @@ public class LuhxGUI extends JFrame {
         new SwingWorker<List<Luhx.SearchResult>, Void>() {
             @Override
             protected List<Luhx.SearchResult> doInBackground() throws Exception {
-                return Luhx.searchFolder(folder, keys);
+                return Luhx.searchFolderPage(folder, 0, SEARCH_PAGE_SIZE + 1, keys);
             }
 
             @Override
             protected void done() {
                 try {
-                    showResults(get(), text);
+                    List<Luhx.SearchResult> results = get();
+                    if (results.isEmpty()) {
+                        JOptionPane.showMessageDialog(LuhxGUI.this, "No files found.",
+                                "No results for: " + text, JOptionPane.INFORMATION_MESSAGE);
+                    } else {
+                        showResults(results, text, folder, keys);
+                    }
                 } catch (Exception ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     JOptionPane.showMessageDialog(LuhxGUI.this, "Search failed: " + cause.getMessage(),
@@ -205,36 +213,97 @@ public class LuhxGUI extends JFrame {
         }.execute();
     }
 
-    private void showResults(List<Luhx.SearchResult> results, String query) {
-        if (results.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No files found.",
-                    "No results for: " + query, JOptionPane.INFORMATION_MESSAGE);
-            return;
+    private void showResults(
+            List<Luhx.SearchResult> firstPage, String query, Path folder, String[] keys) {
+        List<Luhx.SearchResult> loaded = new ArrayList<>();
+        DefaultListModel<String> resultModel = new DefaultListModel<>();
+        int firstPageSize = Math.min(firstPage.size(), SEARCH_PAGE_SIZE);
+        for (int i = 0; i < firstPageSize; i++) {
+            addResult(firstPage.get(i), loaded, resultModel);
         }
-        List<String> lines = new ArrayList<>();
-        for (Luhx.SearchResult r : results) {
-            lines.add(String.format("[%.4f] %s", r.score(), r.file()));
-        }
-        JList<String> view = new JList<>(lines.toArray(new String[0]));
+        JList<String> view = new JList<>(resultModel);
         view.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
                 if (e.getClickCount() == 2) {
                     int index = view.locationToIndex(e.getPoint());
                     if (index >= 0 && view.getCellBounds(index, index).contains(e.getPoint())) {
-                        openPath(results.get(index).file());
+                        openPath(loaded.get(index).file());
                     }
                 }
             }
         });
-        JScrollPane pane = new JScrollPane(view);
-        pane.setPreferredSize(new Dimension(700, 300));
-        JFrame resultsWindow = new JFrame("Results for: " + query + " (" + results.size() + ")");
+
+        JLabel status = new JLabel();
+        JButton loadMore = new JButton();
+        updateSearchStatus(status, loadMore, loaded.size(), firstPage.size() > SEARCH_PAGE_SIZE);
+        loadMore.addActionListener(e ->
+                loadMoreResults(folder, keys, loaded, resultModel, status, loadMore));
+
+        JPanel content = new JPanel(new BorderLayout(0, WindowConfig.GAP));
+        content.add(new JScrollPane(view), BorderLayout.CENTER);
+        JPanel bottom = new JPanel(new BorderLayout(WindowConfig.GAP, 0));
+        bottom.add(status, BorderLayout.CENTER);
+        bottom.add(loadMore, BorderLayout.EAST);
+        content.add(bottom, BorderLayout.SOUTH);
+        content.setBorder(BorderFactory.createEmptyBorder(
+                WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING));
+        content.setPreferredSize(new Dimension(700, 340));
+
+        JFrame resultsWindow = new JFrame("Results for: " + query);
         resultsWindow.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
-        resultsWindow.setContentPane(pane);
+        resultsWindow.setContentPane(content);
         resultsWindow.pack();
         WindowConfig.track(resultsWindow, "results");
         resultsWindow.setVisible(true);
+    }
+
+    private static void addResult(
+            Luhx.SearchResult result, List<Luhx.SearchResult> loaded, DefaultListModel<String> model) {
+        loaded.add(result);
+        model.addElement(String.format("[%.4f] %s", result.score(), result.file()));
+    }
+
+    private static void updateSearchStatus(JLabel status, JButton loadMore, int loaded, boolean hasMore) {
+        status.setText("Showing " + loaded + " results");
+        loadMore.setText(hasMore ? "Load more" : "All results loaded");
+        loadMore.setEnabled(hasMore);
+    }
+
+    private void loadMoreResults(
+            Path folder,
+            String[] keys,
+            List<Luhx.SearchResult> loaded,
+            DefaultListModel<String> model,
+            JLabel status,
+            JButton loadMore) {
+        int offset = loaded.size();
+        loadMore.setEnabled(false);
+        loadMore.setText("Loading...");
+        new SwingWorker<List<Luhx.SearchResult>, Void>() {
+            @Override
+            protected List<Luhx.SearchResult> doInBackground() throws Exception {
+                return Luhx.searchFolderPage(folder, offset, SEARCH_PAGE_SIZE + 1, keys);
+            }
+
+            @Override
+            protected void done() {
+                try {
+                    List<Luhx.SearchResult> page = get();
+                    int pageSize = Math.min(page.size(), SEARCH_PAGE_SIZE);
+                    for (int i = 0; i < pageSize; i++) {
+                        addResult(page.get(i), loaded, model);
+                    }
+                    updateSearchStatus(status, loadMore, loaded.size(), page.size() > SEARCH_PAGE_SIZE);
+                } catch (Exception ex) {
+                    Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
+                    loadMore.setText("Load more");
+                    loadMore.setEnabled(true);
+                    JOptionPane.showMessageDialog(LuhxGUI.this, "Could not load more results: "
+                            + cause.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+            }
+        }.execute();
     }
 
     private void openPath(Path path) {

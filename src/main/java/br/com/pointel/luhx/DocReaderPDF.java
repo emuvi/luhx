@@ -86,6 +86,7 @@ public class DocReaderPDF {
      * @param pageNumber the zero-based index of the page
      * @return the extracted text of the page
      * @throws Exception if the page is out of bounds or reading fails
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
      */
     public String readPage(int pageNumber) throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -101,6 +102,7 @@ public class DocReaderPDF {
      * @param pageNumber the zero-based index of the page
      * @return the text and annotations combined
      * @throws IOException if an error occurs extracting the data
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
      */
     public static String readPage(PDDocument doc, int pageNumber) throws IOException {
         int numPages = doc.getNumberOfPages();
@@ -145,7 +147,8 @@ public class DocReaderPDF {
      * @param pageNumber the zero-based index of the page
      * @param dpi        the resolution (Dots Per Inch) to render the image at
      * @return the rendered image
-     * @throws Exception if an error occurs rendering the page
+     * @throws Exception if an error occurs reading the PDF or rendering the page
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
      */
     public BufferedImage getPageAsImage(int pageNumber, int dpi) throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -170,9 +173,10 @@ public class DocReaderPDF {
     /**
      * Reads a preview of the document contents up to the given length.
      *
-     * @param length the maximum number of characters to return
-     * @return a substring of the text
+     * @param length the maximum number of characters to return; must not be negative
+     * @return up to {@code length} characters
      * @throws Exception if an error occurs
+     * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
         String full = read();
@@ -259,7 +263,7 @@ public class DocReaderPDF {
     /**
      * Retrieves the document creation date.
      *
-     * @return the creation date, or null if unavailable
+     * @return the creation date from PDF metadata, or the file creation date if metadata is unavailable
      * @throws Exception if an error occurs
      */
     public Date getCreationDate() throws Exception {
@@ -274,11 +278,12 @@ public class DocReaderPDF {
     }
 
     /**
-     * Extracts all raw embedded images from a specific page.
+     * Extracts images directly referenced by a page's image XObjects.
      *
      * @param pageNumber the zero-based index of the page
-     * @return a list of BufferedImages found on the page
-     * @throws Exception if an error occurs rendering the page
+     * @return the images found in the page resources
+     * @throws Exception if an error occurs reading the PDF or extracting an image
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
      */
     public List<BufferedImage> getImages(int pageNumber) throws Exception {
         var images = new ArrayList<BufferedImage>();

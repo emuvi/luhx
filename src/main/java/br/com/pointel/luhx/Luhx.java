@@ -354,8 +354,31 @@ public class Luhx {
      * @throws Exception if the index cannot be opened or the query cannot be executed
      */
     public static List<SearchResult> searchFolder(Path folderPath, String... keys) throws Exception {
+        return searchFolderPage(folderPath, 0, Integer.MAX_VALUE, keys);
+    }
+
+    /**
+     * Searches a page of results from the index associated with a folder.
+     *
+     * @param folderPath folder containing the index
+     * @param offset number of highest-ranked results to skip
+     * @param limit maximum number of results to return
+     * @param keys search terms or a Lucene query, optionally including Boolean operators
+     * @return matching files for the requested page, ordered by relevance
+     * @throws IllegalArgumentException if {@code folderPath} is null, {@code offset}
+     *                                  is negative, or {@code limit} is not positive
+     * @throws Exception if the index cannot be opened or the query cannot be executed
+     */
+    public static List<SearchResult> searchFolderPage(
+            Path folderPath, int offset, int limit, String... keys) throws Exception {
         if (folderPath == null) {
             throw new IllegalArgumentException("Folder path cannot be null.");
+        }
+        if (offset < 0) {
+            throw new IllegalArgumentException("Search offset cannot be negative.");
+        }
+        if (limit <= 0) {
+            throw new IllegalArgumentException("Search limit must be positive.");
         }
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
         Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_FILE_NAME);
@@ -374,10 +397,13 @@ public class Luhx {
                 FROM FTL_SEARCH_DATA(?, 0, 0) FT
                 JOIN DOCUMENTS D ON FT."TABLE" = 'DOCUMENTS' AND D.ID = CAST(FT."KEYS"[1] AS BIGINT)
                 ORDER BY FT.SCORE DESC, D.FILE_PATH ASC
+                LIMIT ? OFFSET ?
                 """;
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, query);
+                stmt.setInt(2, limit);
+                stmt.setInt(3, offset);
                 try (ResultSet rs = stmt.executeQuery()) {
                     List<SearchResult> results = new ArrayList<>();
                     while (rs.next()) {

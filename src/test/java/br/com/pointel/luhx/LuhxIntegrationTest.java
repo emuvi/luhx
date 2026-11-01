@@ -67,6 +67,24 @@ class LuhxIntegrationTest {
     }
 
     @Test
+    void shouldReturnSearchResultsInRankedPages() throws Exception {
+        Files.writeString(tempDir.resolve("first.txt"), "ranking ranking ranking");
+        Files.writeString(tempDir.resolve("second.txt"), "ranking ranking");
+        Files.writeString(tempDir.resolve("third.txt"), "ranking");
+        Luhx.indexFolder(tempDir);
+
+        List<Luhx.SearchResult> allResults = Luhx.searchFolder(tempDir, "ranking");
+        List<Luhx.SearchResult> firstPage = Luhx.searchFolderPage(tempDir, 0, 2, "ranking");
+        List<Luhx.SearchResult> secondPage = Luhx.searchFolderPage(tempDir, 2, 2, "ranking");
+
+        assertEquals(2, firstPage.size());
+        assertEquals(1, secondPage.size());
+        assertEquals(allResults, java.util.stream.Stream.concat(
+                firstPage.stream(), secondPage.stream()).toList());
+        assertTrue(Luhx.searchFolderPage(tempDir, 3, 2, "ranking").isEmpty());
+    }
+
+    @Test
     void shouldUpdateIndexWhenFilesAreCreatedModifiedOrDeleted() throws Exception {
         Path doc1 = tempDir.resolve("doc1.txt");
         Path doc2 = tempDir.resolve("doc2.txt");

@@ -234,9 +234,10 @@ public class DocReaderMSO {
     /**
      * Reads a preview of the document contents up to the given length.
      *
-     * @param length the maximum number of characters to return
-     * @return a substring of the text
+     * @param length the maximum number of characters to return; must not be negative
+     * @return up to {@code length} characters
      * @throws Exception if an error occurs
+     * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
         String full = read();
@@ -247,9 +248,10 @@ public class DocReaderMSO {
     }
 
     /**
-     * Obtains the total number of physical pages or slides/sheets in the document.
+     * Obtains the count reported for the document format: pages for Word, sheets
+     * for Excel, or slides for PowerPoint.
      *
-     * @return the total page count, or 1 if unsupported
+     * @return the reported count, or 1 if the format is unsupported or Word page metadata is unavailable
      * @throws Exception if an error occurs reading the document metadata
      */
     public Integer countPages() throws Exception {
@@ -334,7 +336,7 @@ public class DocReaderMSO {
     /**
      * Retrieves the document creation date.
      *
-     * @return the creation date, or null if unavailable
+     * @return the document metadata creation date, or the file creation date if metadata is unavailable
      * @throws Exception if an error occurs
      */
     public Date getCreationDate() throws Exception {
@@ -358,8 +360,9 @@ public class DocReaderMSO {
     }
 
     /**
-     * Core logic to extract a metadata property as an Object using Apache POI.
-     * Supports Word, Excel, and PowerPoint (both legacy OLE2 and modern OOXML).
+     * Extracts a metadata property as an Object using Apache POI.
+     * Supports Word and Excel in legacy OLE2 and modern OOXML formats, and
+     * modern OOXML PowerPoint files.
      *
      * @param property the name of the property to extract (e.g., "author", "title", "creationDate")
      * @return the extracted property value as an Object, or null if unavailable

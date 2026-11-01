@@ -144,7 +144,7 @@ public class DocReader {
     /**
      * Reads all lines from the document text.
      *
-     * @return a list containing all lines
+     * @return a list containing all lines, or an empty list if the format is unsupported
      * @throws Exception if an error occurs
      */
     public List<String> readLines() throws Exception {
@@ -162,9 +162,10 @@ public class DocReader {
     /**
      * Reads a preview of the document contents up to the given length.
      *
-     * @param length the maximum number of characters to return
-     * @return a substring of the text
-     * @throws Exception if an error occurs
+     * @param length the maximum number of characters to return; must not be negative
+     * @return up to {@code length} characters, or an empty string if the format is unsupported
+     * @throws Exception if an error occurs reading the document
+     * @throws IndexOutOfBoundsException if {@code length} is negative and the format is supported
      */
     public String readPreview(int length) throws Exception {
         if (DocReaderPDF.canRead(file)) {
@@ -249,7 +250,8 @@ public class DocReader {
     /**
      * Retrieves the document creation date.
      *
-     * @return the creation date, or null if unavailable
+     * @return the creation date from document metadata or file attributes, or {@code null}
+     *         if the format is unsupported
      * @throws Exception if an error occurs
      */
     public Date getCreationDate() throws Exception {

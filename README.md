@@ -18,7 +18,8 @@ The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are c
 The graphical interface saves and restores the positions and sizes of its windows,
 including dialogs and the folder chooser, in `config.ini` in the application's
 working directory. The main window, search results, and indexing monitor are
-independent maximizable windows.
+independent maximizable windows. Search results show the highest-ranked matches
+first and load further results in batches of 50.
 
 ## API documentation
 
@@ -61,7 +62,7 @@ java -jar dist/luhx.jar --search ./documents lucene AND indexing
 
 ## Use as a library
 
-The public API is `br.com.pointel.luhx.Luhx`. `indexFolder(Path)` indexes or updates a folder and returns `IndexStats`; `indexFolder(Path, IndexObserver)` does the same while reporting progress (`onStart`, `onFile` with an `IndexAction`, `onError`, `onFinish`) to an optional observer; `searchFolder(Path, String...)` returns matching files as `SearchResult` values without printing to the console.
+The public API is `br.com.pointel.luhx.Luhx`. `indexFolder(Path)` indexes or updates a folder and returns `IndexStats`; `indexFolder(Path, IndexObserver)` does the same while reporting progress (`onStart`, `onFile` with an `IndexAction`, `onError`, `onFinish`) to an optional observer; `searchFolder(Path, String...)` returns matching files as `SearchResult` values without printing to the console, and `searchFolderPage(Path, offset, limit, String...)` returns one ranked page of matches.
 
 ```java
 import br.com.pointel.luhx.Luhx;
