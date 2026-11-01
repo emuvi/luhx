@@ -56,7 +56,7 @@ java -jar dist/luhx.jar --search ./documents lucene AND indexing
 
 ## Use as a library
 
-The public API is `br.com.pointel.luhx.Luhx`. `indexFolder(Path)` indexes or updates a folder and returns `IndexStats`; `searchFolder(Path, String...)` returns matching files as `SearchResult` values without printing to the console.
+The public API is `br.com.pointel.luhx.Luhx`. `indexFolder(Path)` indexes or updates a folder and returns `IndexStats`; `indexFolder(Path, IndexObserver)` does the same while reporting progress (`onStart`, `onFile` with an `IndexAction`, `onError`, `onFinish`) to an optional observer; `searchFolder(Path, String...)` returns matching files as `SearchResult` values without printing to the console.
 
 ```java
 import br.com.pointel.luhx.Luhx;

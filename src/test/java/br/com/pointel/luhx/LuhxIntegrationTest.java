@@ -140,13 +140,13 @@ class LuhxIntegrationTest {
             assertTrue(indexOutput.contains("Created: 1"));
 
             outBuffer.reset();
-            Luhx.main(new String[]{"--search", tempDir.toString(), "unique"});
+            LuhxCMD.main(new String[]{"--search", tempDir.toString(), "unique"});
             String searchOutput = outBuffer.toString(StandardCharsets.UTF_8);
             assertTrue(searchOutput.contains("Files found (1):"));
             assertTrue(searchOutput.contains("cli_test.txt"));
 
             outBuffer.reset();
-            Luhx.main(new String[]{"--search", tempDir.toString(), "nonexistent"});
+            LuhxCMD.main(new String[]{"--search", tempDir.toString(), "nonexistent"});
             String emptySearchOutput = outBuffer.toString(StandardCharsets.UTF_8);
             assertTrue(emptySearchOutput.contains("No files found for: nonexistent"));
             assertFalse(emptySearchOutput.contains("cli_test.txt"));

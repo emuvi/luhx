@@ -5,7 +5,6 @@ import java.io.IOException;
 import java.nio.file.FileVisitResult;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.nio.file.SimpleFileVisitor;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.sql.Connection;
@@ -22,15 +21,12 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 /**
  * Indexes supported documents in a folder and searches their extracted content.
  *
  * <p>The index is stored in a {@value #INDEX_DIR_NAME} subdirectory of the
  * indexed folder. Supported files are discovered and read by {@link DocReader}.
- * This class also provides the command-line entry point for indexing and search.
  */
 public class Luhx {
 
@@ -59,100 +55,33 @@ public class Luhx {
      */
     public record SearchResult(Path file, String relativePath, float score) {}
 
-    private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
+    /** The outcome of processing one file during indexing. */
+    public enum IndexAction { CREATED, MODIFIED, DELETED, UNCHANGED, FAILED }
 
     /**
-     * Runs the command-line interface.
-     *
-     * <p>Accepts {@code --index <path>} to create or update an index, or
-     * {@code --search <path> <term>...} to search an existing index.
-     *
-     * @param args command-line arguments
+     * Observes the progress of an indexing run. All methods are optional and are
+     * called on the indexing thread, so implementations should return quickly.
      */
+    public interface IndexObserver {
+
+        /** Called once before scanning starts. */
+        default void onStart(Path folder) {}
+
+        /** Called after each file is processed (or removed from the index). */
+        default void onFile(String relativePath, IndexAction action) {}
+
+        /** Called when a file fails to index; the run is then aborted. */
+        default void onError(String relativePath, Exception error) {}
+
+        /** Called once after a successful run. */
+        default void onFinish(IndexStats stats) {}
+    }
+
+    private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
+
+    /** Launches the application through its command-line entry point. */
     public static void main(String[] args) {
-        configureLogging();
-        if (args == null || args.length == 0) {
-            LuhxGUI.launch();
-            return;
-        }
-        try {
-            run(args);
-        } catch (Exception e) {
-            System.err.println("Error: " + e.getMessage());
-            e.printStackTrace(System.err);
-        }
-    }
-
-    private static void run(String[] args) throws Exception {
-        if (args == null || args.length < 2) {
-            printUsage();
-            return;
-        }
-
-        String command = args[0];
-        Path folder = Paths.get(args[1]).toAbsolutePath().normalize();
-        switch (command) {
-            case "--index" -> {
-                if (args.length != 2) {
-                    printUsage();
-                    return;
-                }
-                IndexStats stats = indexFolder(folder);
-                System.out.printf(
-                        "Index updated at %s (Created: %d, Modified: %d, Deleted: %d, Unchanged: %d)%n",
-                        folder.resolve(INDEX_DIR_NAME),
-                        stats.created(), stats.modified(), stats.deleted(), stats.unchanged());
-            }
-            case "--search" -> {
-                if (args.length < 3) {
-                    System.err.println("Error: Provide at least one search term for --search.");
-                    printUsage();
-                    return;
-                }
-                search(folder, Arrays.copyOfRange(args, 2, args.length));
-            }
-            default -> {
-                System.err.println("Unknown command: " + command);
-                printUsage();
-            }
-        }
-    }
-
-    private static void search(Path folder, String[] keys) throws Exception {
-        Path indexFile = folder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
-        if (!Files.exists(indexFile)) {
-            System.err.println("Index not found in folder: " + folder);
-            System.err.println("Run this first: --index " + folder);
-            return;
-        }
-        if (Arrays.stream(keys).allMatch(key -> key == null || key.isBlank())) {
-            System.err.println("No valid search terms were provided.");
-            return;
-        }
-
-        List<SearchResult> results = searchFolder(folder, keys);
-        if (results.isEmpty()) {
-            System.out.println("No files found for: " + String.join(" ", keys));
-            return;
-        }
-
-        System.out.println("Files found (" + results.size() + "):");
-        for (SearchResult result : results) {
-            System.out.printf("[Score: %.4f] %s%n", result.score(), result.file());
-        }
-    }
-
-    private static void configureLogging() {
-        Logger.getLogger("org.apache.pdfbox").setLevel(Level.OFF);
-        Logger.getLogger("org.apache.fontbox").setLevel(Level.OFF);
-        Logger.getLogger("org.apache.lucene").setLevel(Level.WARNING);
-        System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.NoOpLog");
-    }
-
-    private static void printUsage() {
-        System.out.println("Usage:");
-        System.out.println("  --index <path>             Creates or updates the folder index");
-        System.out.println("  --search <path> <keys>...  Searches the folder index for the given terms");
+        LuhxCMD.main(args);
     }
 
     static String getJdbcUrl(Path folderPath) {
@@ -200,6 +129,19 @@ public class Luhx {
      *                   file cannot be read
      */
     public static IndexStats indexFolder(Path folderPath) throws Exception {
+        return indexFolder(folderPath, null);
+    }
+
+    /**
+     * Creates or updates the index for a folder, reporting progress to an observer.
+     *
+     * @param folderPath folder to index
+     * @param observer   receives progress events; may be null
+     * @return counts of created, modified, deleted, and unchanged files
+     * @see #indexFolder(Path)
+     */
+    public static IndexStats indexFolder(Path folderPath, IndexObserver observer) throws Exception {
+        final IndexObserver obs = observer != null ? observer : new IndexObserver() {};
         if (folderPath == null || !Files.exists(folderPath) || !Files.isDirectory(folderPath)) {
             throw new IllegalArgumentException("The specified path is not a valid folder: " + folderPath);
         }
@@ -210,6 +152,7 @@ public class Luhx {
             Files.createDirectories(indexDir);
         }
 
+        obs.onStart(normalizedFolder);
         try (Connection conn = DriverManager.getConnection(getJdbcUrl(normalizedFolder))) {
             initDatabase(conn);
 
@@ -259,6 +202,7 @@ public class Luhx {
                                 insertStmt.setString(5, content);
                                 insertStmt.executeUpdate();
                                 counts[0]++;
+                                obs.onFile(relPath, IndexAction.CREATED);
                             } else if (existing.lastModified() != lastModified || existing.fileSize() != fileSize) {
                                 String content = extractText(file);
                                 updateStmt.setString(1, file.getName());
@@ -268,10 +212,14 @@ public class Luhx {
                                 updateStmt.setLong(5, existing.id());
                                 updateStmt.executeUpdate();
                                 counts[1]++;
+                                obs.onFile(relPath, IndexAction.MODIFIED);
                             } else {
                                 counts[3]++;
+                                obs.onFile(relPath, IndexAction.UNCHANGED);
                             }
                         } catch (Exception e) {
+                            obs.onFile(relPath, IndexAction.FAILED);
+                            obs.onError(relPath, e);
                             throw new IOException("Failed to index " + relPath, e);
                         }
                         return FileVisitResult.CONTINUE;
@@ -284,11 +232,14 @@ public class Luhx {
                         deleteStmt.setLong(1, doc.id());
                         deleteStmt.executeUpdate();
                         counts[2]++;
+                        obs.onFile(doc.filePath(), IndexAction.DELETED);
                     }
                 }
             }
 
-            return new IndexStats(counts[0], counts[1], counts[2], counts[3]);
+            IndexStats stats = new IndexStats(counts[0], counts[1], counts[2], counts[3]);
+            obs.onFinish(stats);
+            return stats;
         }
     }
 
