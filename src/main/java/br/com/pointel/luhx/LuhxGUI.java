@@ -28,6 +28,8 @@ import java.awt.event.MouseEvent;
 /** Swing graphical interface for indexing and searching folders. */
 public class LuhxGUI extends JFrame {
 
+    private static final String PATHS_FILE = "paths.ini";
+
     private final DefaultListModel<Path> model = new DefaultListModel<>();
     private final JList<Path> list = new JList<>(model);
     private final JTextField searchField = new JTextField();
@@ -78,6 +80,7 @@ public class LuhxGUI extends JFrame {
         setPreferredSize(new Dimension(760, 380));
         pack();
         setLocationRelativeTo(null);
+        loadPaths();
     }
 
     private void addFolder() {
@@ -87,6 +90,7 @@ public class LuhxGUI extends JFrame {
             Path path = chooser.getSelectedFile().toPath().toAbsolutePath().normalize();
             if (!model.contains(path)) {
                 model.addElement(path);
+                savePaths();
             }
         }
     }
@@ -95,6 +99,41 @@ public class LuhxGUI extends JFrame {
         int index = list.getSelectedIndex();
         if (index >= 0) {
             model.remove(index);
+            savePaths();
+        }
+    }
+
+    private void loadPaths() {
+        Path file = Path.of(PATHS_FILE);
+        if (!java.nio.file.Files.exists(file)) {
+            return;
+        }
+        try {
+            for (String line : java.nio.file.Files.readAllLines(file, java.nio.charset.StandardCharsets.UTF_8)) {
+                String text = line.trim();
+                if (!text.isEmpty()) {
+                    Path path = Path.of(text).toAbsolutePath().normalize();
+                    if (!model.contains(path)) {
+                        model.addElement(path);
+                    }
+                }
+            }
+        } catch (java.io.IOException | java.nio.file.InvalidPathException ex) {
+            JOptionPane.showMessageDialog(this, "Could not read " + PATHS_FILE + ": " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+
+    private void savePaths() {
+        List<String> lines = new ArrayList<>();
+        for (int i = 0; i < model.size(); i++) {
+            lines.add(model.get(i).toString());
+        }
+        try {
+            java.nio.file.Files.write(Path.of(PATHS_FILE), lines, java.nio.charset.StandardCharsets.UTF_8);
+        } catch (java.io.IOException ex) {
+            JOptionPane.showMessageDialog(this, "Could not save " + PATHS_FILE + ": " + ex.getMessage(),
+                    "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
 
