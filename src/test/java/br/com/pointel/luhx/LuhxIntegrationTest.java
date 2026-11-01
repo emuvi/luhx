@@ -137,7 +137,7 @@ class LuhxIntegrationTest {
 
             Luhx.main(new String[]{"--index", tempDir.toString()});
             String indexOutput = outBuffer.toString(StandardCharsets.UTF_8);
-            assertTrue(indexOutput.contains("[CRIADO]     cli_test.txt"));
+            assertTrue(indexOutput.contains("Criados: 1"));
 
             outBuffer.reset();
             Luhx.main(new String[]{"--search", tempDir.toString(), "exclusiva"});
@@ -179,4 +179,3 @@ class LuhxIntegrationTest {
     }
 
 }
-

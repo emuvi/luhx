@@ -9,7 +9,7 @@
     <version>1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
     <name>Luhx</name>
-    <description>A Java application for storing, indexing, and searching documents.</description>
+    <description>A document indexing and search lib and cmd app built with Lucene and H2.</description>
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

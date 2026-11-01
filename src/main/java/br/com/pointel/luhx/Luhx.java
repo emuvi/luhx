@@ -26,7 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Exemplo de indexação e busca full-text em arquivos utilizando H2 Database + Apache Lucene (FTL_INIT).
+ * Public API for indexing and searching supported documents.
  */
 public class Luhx {
 
@@ -55,40 +55,75 @@ public class Luhx {
     private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
 
     public static void main(String[] args) {
-        silenceLoggers();
-
-        if (args.length < 2) {
-            printUsage();
-            return;
-        }
-
-        String command = args[0];
-        Path folderPath = Paths.get(args[1]).toAbsolutePath().normalize();
-
+        configureLogging();
         try {
-            switch (command) {
-                case "--index" -> indexFolder(folderPath);
-                case "--search" -> {
-                    if (args.length < 3) {
-                        System.err.println("Erro: Informe ao menos uma chave de busca para --search.");
-                        printUsage();
-                        return;
-                    }
-                    String[] keys = Arrays.copyOfRange(args, 2, args.length);
-                    searchFolder(folderPath, keys);
-                }
-                default -> {
-                    System.err.println("Comando desconhecido: " + command);
-                    printUsage();
-                }
-            }
+            run(args);
         } catch (Exception e) {
             System.err.println("Erro: " + e.getMessage());
             e.printStackTrace(System.err);
         }
     }
 
-    private static void silenceLoggers() {
+    private static void run(String[] args) throws Exception {
+        if (args == null || args.length < 2) {
+            printUsage();
+            return;
+        }
+
+        String command = args[0];
+        Path folder = Paths.get(args[1]).toAbsolutePath().normalize();
+        switch (command) {
+            case "--index" -> {
+                if (args.length != 2) {
+                    printUsage();
+                    return;
+                }
+                IndexStats stats = indexFolder(folder);
+                System.out.printf(
+                        "Índice atualizado em %s (Criados: %d, Modificados: %d, Excluídos: %d, Inalterados: %d)%n",
+                        folder.resolve(INDEX_DIR_NAME),
+                        stats.created(), stats.modified(), stats.deleted(), stats.unchanged());
+            }
+            case "--search" -> {
+                if (args.length < 3) {
+                    System.err.println("Erro: Informe ao menos uma chave de busca para --search.");
+                    printUsage();
+                    return;
+                }
+                search(folder, Arrays.copyOfRange(args, 2, args.length));
+            }
+            default -> {
+                System.err.println("Comando desconhecido: " + command);
+                printUsage();
+            }
+        }
+    }
+
+    private static void search(Path folder, String[] keys) throws Exception {
+        Path indexFile = folder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
+        if (!Files.exists(indexFile)) {
+            System.err.println("Índice não encontrado na pasta: " + folder);
+            System.err.println("Execute primeiro: --index " + folder);
+            return;
+        }
+        if (Arrays.stream(keys).allMatch(key -> key == null || key.isBlank())) {
+            System.err.println("Nenhuma chave de busca válida foi informada.");
+            return;
+        }
+
+        List<SearchResult> results = searchFolder(folder, keys);
+        if (results.isEmpty()) {
+            System.out.println("Nenhum arquivo encontrado para: " + String.join(" ", keys));
+            return;
+        }
+
+        System.out.println("Arquivos encontrados (" + results.size() + "):");
+        for (SearchResult result : results) {
+            System.out.printf("[Score: %.4f] %s%n", result.score(), result.file());
+        }
+    }
+
+    private static void configureLogging() {
         Logger.getLogger("org.apache.pdfbox").setLevel(Level.OFF);
         Logger.getLogger("org.apache.fontbox").setLevel(Level.OFF);
         Logger.getLogger("org.apache.lucene").setLevel(Level.WARNING);
@@ -132,7 +167,6 @@ public class Luhx {
     }
 
     public static IndexStats indexFolder(Path folderPath) throws Exception {
-        silenceLoggers();
         if (folderPath == null || !Files.exists(folderPath) || !Files.isDirectory(folderPath)) {
             throw new IllegalArgumentException("O caminho informado não é uma pasta válida: " + folderPath);
         }
@@ -169,7 +203,7 @@ public class Luhx {
                     }
 
                     @Override
-                    public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) {
+                    public FileVisitResult visitFile(Path filePath, BasicFileAttributes attrs) throws IOException {
                         File file = filePath.toFile();
                         if (!DocReader.canRead(file)) {
                             return FileVisitResult.CONTINUE;
@@ -192,7 +226,6 @@ public class Luhx {
                                 insertStmt.setString(5, content);
                                 insertStmt.executeUpdate();
                                 counts[0]++;
-                                System.out.println("[CRIADO]     " + relPath);
                             } else if (existing.lastModified() != lastModified || existing.fileSize() != fileSize) {
                                 String content = extractText(file);
                                 updateStmt.setString(1, file.getName());
@@ -202,20 +235,15 @@ public class Luhx {
                                 updateStmt.setLong(5, existing.id());
                                 updateStmt.executeUpdate();
                                 counts[1]++;
-                                System.out.println("[MODIFICADO] " + relPath);
                             } else {
                                 counts[3]++;
                             }
                         } catch (Exception e) {
-                            System.err.println("[ERRO] Falha ao indexar " + relPath + ": " + e.getMessage());
+                            throw new IOException("Falha ao indexar " + relPath, e);
                         }
                         return FileVisitResult.CONTINUE;
                     }
 
-                    @Override
-                    public FileVisitResult visitFileFailed(Path file, IOException exc) {
-                        return FileVisitResult.CONTINUE;
-                    }
                 });
 
                 for (DocMeta doc : existingDocs.values()) {
@@ -223,14 +251,10 @@ public class Luhx {
                         deleteStmt.setLong(1, doc.id());
                         deleteStmt.executeUpdate();
                         counts[2]++;
-                        System.out.println("[EXCLUÍDO]   " + doc.filePath());
                     }
                 }
             }
 
-            System.out.printf(
-                    "Índice atualizado em %s (Criados: %d, Modificados: %d, Excluídos: %d, Inalterados: %d)%n",
-                    indexDir, counts[0], counts[1], counts[2], counts[3]);
             return new IndexStats(counts[0], counts[1], counts[2], counts[3]);
         }
     }
@@ -259,21 +283,17 @@ public class Luhx {
     }
 
     public static List<SearchResult> searchFolder(Path folderPath, String... keys) throws Exception {
-        silenceLoggers();
         if (folderPath == null) {
             throw new IllegalArgumentException("O caminho da pasta não pode ser nulo.");
         }
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
         Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
         if (!Files.exists(dbFile)) {
-            System.err.println("Índice não encontrado na pasta: " + normalizedFolder);
-            System.err.println("Execute primeiro: --index " + normalizedFolder);
             return Collections.emptyList();
         }
 
         String query = buildLuceneQuery(keys);
         if (query.isBlank()) {
-            System.err.println("Nenhuma chave de busca válida foi informada.");
             return Collections.emptyList();
         }
 
@@ -296,14 +316,6 @@ public class Luhx {
                         results.add(new SearchResult(fullPath, relPath, score));
                     }
 
-                    if (results.isEmpty()) {
-                        System.out.println("Nenhum arquivo encontrado para: " + String.join(" ", keys));
-                    } else {
-                        System.out.println("Arquivos encontrados (" + results.size() + "):");
-                        for (SearchResult item : results) {
-                            System.out.printf("[Score: %.4f] %s%n", item.score(), item.file());
-                        }
-                    }
                     return results;
                 }
             }

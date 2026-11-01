@@ -10,6 +10,21 @@ mvn clean package
 
 O JAR executável será gerado em `dist/luhx.jar` (com as dependências em `dist/lib/`).
 
+## Uso como biblioteca
+
+O mesmo projeto também disponibiliza a API Java em `br.com.pointel.luhx.Luhx`.
+Use `indexFolder(Path)` para indexar ou atualizar uma pasta e `searchFolder(Path, String...)`
+para recuperar resultados como `SearchResult`, sem imprimir saída no console:
+
+```java
+Luhx.IndexStats stats = Luhx.indexFolder(Path.of("documentos"));
+List<Luhx.SearchResult> results = Luhx.searchFolder(Path.of("documentos"), "lucene", "h2");
+```
+
+O mesmo arquivo `Luhx.java` contém o ponto de entrada CLI (`main`) e a API da biblioteca;
+os métodos de parsing e saída do terminal ficam em helpers privados, separados das operações
+de indexação e busca disponibilizadas publicamente.
+
 ## Funcionalidades
 
 ### 1. Criar ou atualizar o índice de uma pasta (`--index`)
