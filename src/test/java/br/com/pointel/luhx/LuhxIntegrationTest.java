@@ -28,18 +28,18 @@ class LuhxIntegrationTest {
 
     @Test
     void shouldIndexAndSearchAcrossMultipleFileFormatsAndSubdirectories() throws Exception {
-        Path subDir = Files.createDirectories(tempDir.resolve("subpasta"));
+        Path subDir = Files.createDirectories(tempDir.resolve("subfolder"));
 
-        Files.writeString(tempDir.resolve("arquitetura.txt"),
-                "O Apache Lucene utiliza o algoritmo BM25 para ranking de busca textual.");
-        Files.writeString(subDir.resolve("banco.md"),
-                "O H2 Database embarcado integra busca full-text com FTL_INIT.");
+        Files.writeString(tempDir.resolve("architecture.txt"),
+                "Apache Lucene uses the BM25 algorithm for text search ranking.");
+        Files.writeString(subDir.resolve("database.md"),
+                "The embedded H2 Database integrates full-text search with FTL_INIT.");
         Files.write(tempDir.resolve("ignorado.bin"), new byte[]{0, 1, 2, 3});
 
         createSamplePdf(tempDir.resolve("manual.pdf").toFile(),
-                "Manual tecnico sobre indices invertidos e Finite State Transducers.");
+                "Technical manual about inverted indexes and Finite State Transducers.");
         createSampleDocx(subDir.resolve("relatorio.docx").toFile(),
-                "Relatorio executivo de performance com MemorySegment no Java 21.");
+                "Executive performance report about MemorySegment in Java 21.");
 
         Luhx.IndexStats stats = Luhx.indexFolder(tempDir);
         assertEquals(4, stats.created());
@@ -48,11 +48,11 @@ class LuhxIntegrationTest {
         assertEquals(0, stats.unchanged());
 
         Path dbFile = tempDir.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".mv.db");
-        assertTrue(Files.exists(dbFile), "O arquivo do banco H2 deve ser salvo dentro da própria pasta");
+        assertTrue(Files.exists(dbFile), "The H2 database file should be saved in the folder itself");
 
         List<Luhx.SearchResult> bm25Results = Luhx.searchFolder(tempDir, "BM25");
         assertEquals(1, bm25Results.size());
-        assertEquals("arquitetura.txt", bm25Results.get(0).relativePath());
+        assertEquals("architecture.txt", bm25Results.get(0).relativePath());
 
         List<Luhx.SearchResult> pdfResults = Luhx.searchFolder(tempDir, "Transducers");
         assertEquals(1, pdfResults.size());
@@ -60,7 +60,7 @@ class LuhxIntegrationTest {
 
         List<Luhx.SearchResult> docxResults = Luhx.searchFolder(tempDir, "MemorySegment", "Java");
         assertEquals(1, docxResults.size());
-        assertEquals("subpasta/relatorio.docx", docxResults.get(0).relativePath());
+        assertEquals("subfolder/relatorio.docx", docxResults.get(0).relativePath());
 
         List<Luhx.SearchResult> orResults = Luhx.searchFolder(tempDir, "BM25", "OR", "FTL_INIT");
         assertEquals(2, orResults.size());
@@ -72,63 +72,63 @@ class LuhxIntegrationTest {
         Path doc2 = tempDir.resolve("doc2.txt");
         Path doc3 = tempDir.resolve("doc3.txt");
 
-        Files.writeString(doc1, "Conteudo original sobre algoritmos de busca nativa.");
-        Files.writeString(doc2, "Documento que permanecera inalterado durante o teste.");
-        Files.writeString(doc3, "Documento temporario contendo a palavra efemero.");
+        Files.writeString(doc1, "Original content about native search algorithms.");
+        Files.writeString(doc2, "Document that will remain unchanged during the test.");
+        Files.writeString(doc3, "Temporary document containing the word ephemeral.");
 
-        // 1. Primeira indexação
+        // 1. Initial indexing
         Luhx.IndexStats initialStats = Luhx.indexFolder(tempDir);
         assertEquals(3, initialStats.created());
         assertEquals(0, initialStats.modified());
         assertEquals(0, initialStats.deleted());
         assertEquals(0, initialStats.unchanged());
 
-        assertEquals(1, Luhx.searchFolder(tempDir, "efemero").size());
-        assertEquals(1, Luhx.searchFolder(tempDir, "nativa").size());
+        assertEquals(1, Luhx.searchFolder(tempDir, "ephemeral").size());
+        assertEquals(1, Luhx.searchFolder(tempDir, "native").size());
 
-        // 2. Reindexação sem nenhuma mudança nos arquivos
+        // 2. Reindexing without any file changes
         Luhx.IndexStats unchangedStats = Luhx.indexFolder(tempDir);
         assertEquals(0, unchangedStats.created());
         assertEquals(0, unchangedStats.modified());
         assertEquals(0, unchangedStats.deleted());
         assertEquals(3, unchangedStats.unchanged());
 
-        // 3. Criar doc4, modificar doc1 e excluir doc3
+        // 3. Create doc4, modify doc1, and delete doc3
         Path doc4 = tempDir.resolve("doc4.txt");
-        Files.writeString(doc4, "Novo arquivo adicionado com o termo criptografia.");
+        Files.writeString(doc4, "New file added with the term encryption.");
 
-        Files.writeString(doc1, "Conteudo atualizado sobre motores de indexacao distribuida.");
+        Files.writeString(doc1, "Updated content about distributed indexing engines.");
         Files.setLastModifiedTime(doc1, FileTime.fromMillis(System.currentTimeMillis() + 5000));
 
         Files.delete(doc3);
 
         Luhx.IndexStats updatedStats = Luhx.indexFolder(tempDir);
-        assertEquals(1, updatedStats.created(), "Deve detectar 1 arquivo criado (doc4.txt)");
-        assertEquals(1, updatedStats.modified(), "Deve detectar 1 arquivo modificado (doc1.txt)");
-        assertEquals(1, updatedStats.deleted(), "Deve detectar 1 arquivo excluído (doc3.txt)");
-        assertEquals(1, updatedStats.unchanged(), "Deve manter 1 arquivo inalterado (doc2.txt)");
+        assertEquals(1, updatedStats.created(), "Should detect 1 created file (doc4.txt)");
+        assertEquals(1, updatedStats.modified(), "Should detect 1 modified file (doc1.txt)");
+        assertEquals(1, updatedStats.deleted(), "Should detect 1 deleted file (doc3.txt)");
+        assertEquals(1, updatedStats.unchanged(), "Should keep 1 unchanged file (doc2.txt)");
 
-        // Verifica que o arquivo criado é encontrado
-        List<Luhx.SearchResult> createdSearch = Luhx.searchFolder(tempDir, "criptografia");
+        // Verify that the created file can be found
+        List<Luhx.SearchResult> createdSearch = Luhx.searchFolder(tempDir, "encryption");
         assertEquals(1, createdSearch.size());
         assertEquals("doc4.txt", createdSearch.get(0).relativePath());
 
-        // Verifica que o arquivo modificado responde pelo novo conteúdo e não pelo antigo
-        List<Luhx.SearchResult> modifiedNewTerm = Luhx.searchFolder(tempDir, "distribuida");
+        // Verify that the modified file matches its new content, not the old content
+        List<Luhx.SearchResult> modifiedNewTerm = Luhx.searchFolder(tempDir, "distributed");
         assertEquals(1, modifiedNewTerm.size());
         assertEquals("doc1.txt", modifiedNewTerm.get(0).relativePath());
-        assertTrue(Luhx.searchFolder(tempDir, "nativa").isEmpty(),
-                "Termo antigo do arquivo modificado não deve mais retornar o documento");
+        assertTrue(Luhx.searchFolder(tempDir, "native").isEmpty(),
+                "The old term from the modified file should no longer return the document");
 
-        // Verifica que o arquivo excluído não retorna mais na busca
-        assertTrue(Luhx.searchFolder(tempDir, "efemero").isEmpty(),
-                "Arquivo excluído não deve mais aparecer nos resultados de busca");
+        // Verify that the deleted file no longer appears in search results
+        assertTrue(Luhx.searchFolder(tempDir, "ephemeral").isEmpty(),
+                "The deleted file should no longer appear in search results");
     }
 
     @Test
     void shouldExecuteCliCommandsViaMainMethod() throws Exception {
         Path file = tempDir.resolve("cli_test.txt");
-        Files.writeString(file, "Teste de linha de comando com Luhx e palavra-chave exclusiva.");
+        Files.writeString(file, "Command-line test with Luhx and a unique keyword.");
 
         PrintStream originalOut = System.out;
         ByteArrayOutputStream outBuffer = new ByteArrayOutputStream();
@@ -137,18 +137,18 @@ class LuhxIntegrationTest {
 
             Luhx.main(new String[]{"--index", tempDir.toString()});
             String indexOutput = outBuffer.toString(StandardCharsets.UTF_8);
-            assertTrue(indexOutput.contains("Criados: 1"));
+            assertTrue(indexOutput.contains("Created: 1"));
 
             outBuffer.reset();
-            Luhx.main(new String[]{"--search", tempDir.toString(), "exclusiva"});
+            Luhx.main(new String[]{"--search", tempDir.toString(), "unique"});
             String searchOutput = outBuffer.toString(StandardCharsets.UTF_8);
-            assertTrue(searchOutput.contains("Arquivos encontrados (1):"));
+            assertTrue(searchOutput.contains("Files found (1):"));
             assertTrue(searchOutput.contains("cli_test.txt"));
 
             outBuffer.reset();
-            Luhx.main(new String[]{"--search", tempDir.toString(), "inexistente"});
+            Luhx.main(new String[]{"--search", tempDir.toString(), "nonexistent"});
             String emptySearchOutput = outBuffer.toString(StandardCharsets.UTF_8);
-            assertTrue(emptySearchOutput.contains("Nenhum arquivo encontrado para: inexistente"));
+            assertTrue(emptySearchOutput.contains("No files found for: nonexistent"));
             assertFalse(emptySearchOutput.contains("cli_test.txt"));
         } finally {
             System.setOut(originalOut);

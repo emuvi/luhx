@@ -34,7 +34,7 @@ class DocReaderTest {
     @Test
     void shouldReadPlainTextFileThroughDocReader() throws Exception {
         Path txtPath = tempDir.resolve("sample.txt");
-        Files.writeString(txtPath, "Primeira linha de teste\nSegunda linha com Lucene");
+        Files.writeString(txtPath, "First line for testing\nSecond line with Lucene");
         File file = txtPath.toFile();
 
         assertTrue(DocReader.canRead(file));
@@ -45,12 +45,12 @@ class DocReaderTest {
         assertTrue(reader.getLastModified() > 0);
 
         String content = reader.read();
-        assertTrue(content.contains("Primeira linha de teste"));
-        assertTrue(content.contains("Segunda linha com Lucene"));
+        assertTrue(content.contains("First line for testing"));
+        assertTrue(content.contains("Second line with Lucene"));
         assertEquals(2, reader.readLines().size());
-        assertEquals("Primeira", reader.readPreview(8));
+        assertEquals("First li", reader.readPreview(8));
         assertEquals(8, reader.getWordCount());
-        assertTrue(reader.getCharCount() >= 47);
+        assertEquals(content.length(), reader.getCharCount());
         assertEquals(1, reader.countPages());
         assertNotNull(reader.getCreationDate());
         assertNull(reader.getPageAsImage(0, 72));
@@ -61,8 +61,8 @@ class DocReaderTest {
         File pdfFile = tempDir.resolve("document.pdf").toFile();
         try (PDDocument doc = new PDDocument()) {
             PDDocumentInformation info = new PDDocumentInformation();
-            info.setTitle("Titulo PDF");
-            info.setAuthor("Autor Teste");
+            info.setTitle("PDF Title");
+            info.setAuthor("Test Author");
             doc.setDocumentInformation(info);
 
             PDPage page = new PDPage();
@@ -71,7 +71,7 @@ class DocReaderTest {
                 contentStream.beginText();
                 contentStream.setFont(PDType1Font.HELVETICA, 12);
                 contentStream.newLineAtOffset(50, 700);
-                contentStream.showText("Conteudo extraido de um arquivo PDF para o Lucene");
+                contentStream.showText("Content extracted from a PDF file for Lucene");
                 contentStream.endText();
             }
             doc.save(pdfFile);
@@ -80,10 +80,10 @@ class DocReaderTest {
         assertTrue(DocReader.canRead(pdfFile));
         DocReader reader = new DocReader(pdfFile);
         String text = reader.read();
-        assertTrue(text.contains("Conteudo extraido de um arquivo PDF para o Lucene"));
+        assertTrue(text.contains("Content extracted from a PDF file for Lucene"));
         assertEquals(1, reader.countPages());
-        assertEquals("Titulo PDF", reader.getTitle());
-        assertEquals("Autor Teste", reader.getAuthor());
+        assertEquals("PDF Title", reader.getTitle());
+        assertEquals("Test Author", reader.getAuthor());
         assertNotNull(reader.getPageAsImage(0, 72));
     }
 
@@ -109,19 +109,19 @@ class DocReaderTest {
         File xlsxFile = tempDir.resolve("spreadsheet.xlsx").toFile();
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              FileOutputStream out = new FileOutputStream(xlsxFile)) {
-            var sheet = workbook.createSheet("Financeiro");
+            var sheet = workbook.createSheet("Finance");
             var row = sheet.createRow(0);
-            row.createCell(0).setCellValue("Faturamento");
-            row.createCell(1).setCellValue("Trimestral");
+            row.createCell(0).setCellValue("Revenue");
+            row.createCell(1).setCellValue("Quarterly");
             workbook.write(out);
         }
 
         assertTrue(DocReader.canRead(xlsxFile));
         DocReader reader = new DocReader(xlsxFile);
         String text = reader.read();
-        assertTrue(text.contains("Financeiro"));
-        assertTrue(text.contains("Faturamento"));
-        assertTrue(text.contains("Trimestral"));
+        assertTrue(text.contains("Finance"));
+        assertTrue(text.contains("Revenue"));
+        assertTrue(text.contains("Quarterly"));
         assertEquals(1, reader.countPages());
     }
 
@@ -133,14 +133,14 @@ class DocReaderTest {
             XSLFSlide slide = ppt.createSlide();
             XSLFTextBox box = slide.createTextBox();
             box.setAnchor(new Rectangle(50, 50, 400, 100));
-            box.setText("Apresentacao sobre arquitetura de motores de busca");
+            box.setText("Presentation about search engine architecture");
             ppt.write(out);
         }
 
         assertTrue(DocReader.canRead(pptxFile));
         DocReader reader = new DocReader(pptxFile);
         String text = reader.read();
-        assertTrue(text.contains("Apresentacao sobre arquitetura de motores de busca"));
+        assertTrue(text.contains("Presentation about search engine architecture"));
         assertEquals(1, reader.countPages());
     }
 
@@ -161,4 +161,3 @@ class DocReaderTest {
     }
 
 }
-

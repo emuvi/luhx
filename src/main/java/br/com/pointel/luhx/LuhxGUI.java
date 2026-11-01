@@ -110,13 +110,13 @@ public class LuhxGUI extends JFrame {
                 try {
                     Luhx.IndexStats s = get();
                     JOptionPane.showMessageDialog(LuhxGUI.this, String.format(
-                            "Indexação concluída em %s%nCriados: %d, Modificados: %d, Excluídos: %d, Inalterados: %d",
+                            "Indexing completed at %s%nCreated: %d, Modified: %d, Deleted: %d, Unchanged: %d",
                             folder, s.created(), s.modified(), s.deleted(), s.unchanged()));
                 } catch (Exception ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     JOptionPane.showMessageDialog(LuhxGUI.this,
-                            "Falha ao indexar " + folder + ": " + cause.getMessage(),
-                            "Erro", JOptionPane.ERROR_MESSAGE);
+                            "Failed to index " + folder + ": " + cause.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         }.execute();
@@ -125,17 +125,17 @@ public class LuhxGUI extends JFrame {
     private void search() {
         Path folder = list.getSelectedValue();
         if (folder == null) {
-            JOptionPane.showMessageDialog(this, "Selecione um diretório na lista.");
+            JOptionPane.showMessageDialog(this, "Select a folder from the list.");
             return;
         }
         String text = searchField.getText().trim();
         if (text.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Informe os termos de pesquisa.");
+            JOptionPane.showMessageDialog(this, "Enter search terms.");
             return;
         }
         if (!java.nio.file.Files.exists(folder.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".mv.db"))) {
             JOptionPane.showMessageDialog(this,
-                    "Diretório ainda não indexado. Dê um duplo clique nele para indexar.");
+                    "Folder not indexed yet. Double-click it to index.");
             return;
         }
         String[] keys = text.split("\\s+");
@@ -151,8 +151,8 @@ public class LuhxGUI extends JFrame {
                     showResults(get());
                 } catch (Exception ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
-                    JOptionPane.showMessageDialog(LuhxGUI.this, "Falha na pesquisa: " + cause.getMessage(),
-                            "Erro", JOptionPane.ERROR_MESSAGE);
+                    JOptionPane.showMessageDialog(LuhxGUI.this, "Search failed: " + cause.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
                 }
             }
         }.execute();
@@ -160,7 +160,7 @@ public class LuhxGUI extends JFrame {
 
     private void showResults(List<Luhx.SearchResult> results) {
         if (results.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "Nenhum arquivo encontrado.");
+            JOptionPane.showMessageDialog(this, "No files found.");
             return;
         }
         List<String> lines = new ArrayList<>();
@@ -170,7 +170,7 @@ public class LuhxGUI extends JFrame {
         JList<String> view = new JList<>(lines.toArray(new String[0]));
         JScrollPane pane = new JScrollPane(view);
         pane.setPreferredSize(new Dimension(700, 300));
-        JOptionPane.showMessageDialog(this, pane, "Resultados (" + results.size() + ")",
+        JOptionPane.showMessageDialog(this, pane, "Results (" + results.size() + ")",
                 JOptionPane.PLAIN_MESSAGE);
     }
 

@@ -19,7 +19,7 @@ class LuhxUnitTest {
     void shouldBuildLuceneQueryFromSingleAndMultipleKeys() {
         assertEquals("lucene", Luhx.buildLuceneQuery("lucene"));
         assertEquals("lucene AND h2", Luhx.buildLuceneQuery("lucene", "h2"));
-        assertEquals("java AND banco AND dados", Luhx.buildLuceneQuery(" java ", "banco", " dados "));
+        assertEquals("java AND database AND data", Luhx.buildLuceneQuery(" java ", "database", " data "));
     }
 
     @Test
@@ -51,15 +51,14 @@ class LuhxUnitTest {
         assertThrows(IllegalArgumentException.class, () -> Luhx.indexFolder(null));
 
         Path regularFile = tempDir.resolve("single_file.txt");
-        Files.writeString(regularFile, "conteudo");
+        Files.writeString(regularFile, "content");
         assertThrows(IllegalArgumentException.class, () -> Luhx.indexFolder(regularFile));
     }
 
     @Test
     void shouldReturnEmptyListWhenSearchingUnindexedFolder() throws Exception {
-        List<Luhx.SearchResult> results = Luhx.searchFolder(tempDir, "qualquer");
+        List<Luhx.SearchResult> results = Luhx.searchFolder(tempDir, "anything");
         assertTrue(results.isEmpty());
     }
 
 }
-

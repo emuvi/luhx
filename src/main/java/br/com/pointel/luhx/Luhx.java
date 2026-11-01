@@ -78,7 +78,7 @@ public class Luhx {
         try {
             run(args);
         } catch (Exception e) {
-            System.err.println("Erro: " + e.getMessage());
+            System.err.println("Error: " + e.getMessage());
             e.printStackTrace(System.err);
         }
     }
@@ -99,20 +99,20 @@ public class Luhx {
                 }
                 IndexStats stats = indexFolder(folder);
                 System.out.printf(
-                        "Índice atualizado em %s (Criados: %d, Modificados: %d, Excluídos: %d, Inalterados: %d)%n",
+                        "Index updated at %s (Created: %d, Modified: %d, Deleted: %d, Unchanged: %d)%n",
                         folder.resolve(INDEX_DIR_NAME),
                         stats.created(), stats.modified(), stats.deleted(), stats.unchanged());
             }
             case "--search" -> {
                 if (args.length < 3) {
-                    System.err.println("Erro: Informe ao menos uma chave de busca para --search.");
+                    System.err.println("Error: Provide at least one search term for --search.");
                     printUsage();
                     return;
                 }
                 search(folder, Arrays.copyOfRange(args, 2, args.length));
             }
             default -> {
-                System.err.println("Comando desconhecido: " + command);
+                System.err.println("Unknown command: " + command);
                 printUsage();
             }
         }
@@ -121,22 +121,22 @@ public class Luhx {
     private static void search(Path folder, String[] keys) throws Exception {
         Path indexFile = folder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
         if (!Files.exists(indexFile)) {
-            System.err.println("Índice não encontrado na pasta: " + folder);
-            System.err.println("Execute primeiro: --index " + folder);
+            System.err.println("Index not found in folder: " + folder);
+            System.err.println("Run this first: --index " + folder);
             return;
         }
         if (Arrays.stream(keys).allMatch(key -> key == null || key.isBlank())) {
-            System.err.println("Nenhuma chave de busca válida foi informada.");
+            System.err.println("No valid search terms were provided.");
             return;
         }
 
         List<SearchResult> results = searchFolder(folder, keys);
         if (results.isEmpty()) {
-            System.out.println("Nenhum arquivo encontrado para: " + String.join(" ", keys));
+            System.out.println("No files found for: " + String.join(" ", keys));
             return;
         }
 
-        System.out.println("Arquivos encontrados (" + results.size() + "):");
+        System.out.println("Files found (" + results.size() + "):");
         for (SearchResult result : results) {
             System.out.printf("[Score: %.4f] %s%n", result.score(), result.file());
         }
@@ -150,9 +150,9 @@ public class Luhx {
     }
 
     private static void printUsage() {
-        System.out.println("Uso:");
-        System.out.println("  --index <path>             Monta ou atualiza o índice da pasta");
-        System.out.println("  --search <path> <keys>...  Procura no índice da pasta pelas chaves informadas");
+        System.out.println("Usage:");
+        System.out.println("  --index <path>             Creates or updates the folder index");
+        System.out.println("  --search <path> <keys>...  Searches the folder index for the given terms");
     }
 
     static String getJdbcUrl(Path folderPath) {
@@ -201,7 +201,7 @@ public class Luhx {
      */
     public static IndexStats indexFolder(Path folderPath) throws Exception {
         if (folderPath == null || !Files.exists(folderPath) || !Files.isDirectory(folderPath)) {
-            throw new IllegalArgumentException("O caminho informado não é uma pasta válida: " + folderPath);
+            throw new IllegalArgumentException("The specified path is not a valid folder: " + folderPath);
         }
 
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
@@ -272,7 +272,7 @@ public class Luhx {
                                 counts[3]++;
                             }
                         } catch (Exception e) {
-                            throw new IOException("Falha ao indexar " + relPath, e);
+                            throw new IOException("Failed to index " + relPath, e);
                         }
                         return FileVisitResult.CONTINUE;
                     }
@@ -331,7 +331,7 @@ public class Luhx {
      */
     public static List<SearchResult> searchFolder(Path folderPath, String... keys) throws Exception {
         if (folderPath == null) {
-            throw new IllegalArgumentException("O caminho da pasta não pode ser nulo.");
+            throw new IllegalArgumentException("Folder path cannot be null.");
         }
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
         Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
