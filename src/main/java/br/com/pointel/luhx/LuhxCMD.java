@@ -69,7 +69,7 @@ public final class LuhxCMD {
     }
 
     private static void search(Path folder, String[] keys) throws Exception {
-        Path indexFile = folder.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".h2.db");
+        Path indexFile = folder.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_FILE_NAME);
         if (!Files.exists(indexFile)) {
             System.err.println("Index not found in folder: " + folder);
             System.err.println("Run this first: --index " + folder);

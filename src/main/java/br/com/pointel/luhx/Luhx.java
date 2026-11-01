@@ -36,6 +36,9 @@ public class Luhx {
     /** Base name of the H2 database file that stores an index. */
     public static final String DB_NAME = "index";
 
+    /** Name of the file H2 2.x creates on disk for the database named {@value #DB_NAME}. */
+    public static final String DB_FILE_NAME = DB_NAME + ".mv.db";
+
     /**
      * Counts the files created, updated, removed, or left unchanged in an indexing run.
      *
@@ -303,7 +306,7 @@ public class Luhx {
             throw new IllegalArgumentException("Folder path cannot be null.");
         }
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
-        Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".h2.db");
+        Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_FILE_NAME);
         if (!Files.exists(dbFile)) {
             return Collections.emptyList();
         }
