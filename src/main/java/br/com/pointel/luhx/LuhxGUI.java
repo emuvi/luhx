@@ -327,4 +327,9 @@ public class LuhxGUI extends JFrame {
         FlatLightLaf.setup();
         SwingUtilities.invokeLater(() -> new LuhxGUI().setVisible(true));
     }
+
+    /** Launches the graphical interface. */
+    public static void main(String[] args) {
+        launch();
+    }
 }

@@ -15,6 +15,18 @@ mvn clean package
 
 The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are copied to `dist/lib/`.
 
+## Windows distributions
+
+Run `dist-cmd.bat` to build a self-contained command-line application, or
+`dist-gui.bat` to build the graphical interface. Both scripts require JDK 21 or
+later, Maven, and WiX Toolset 3.x on Windows. The command-line distribution
+includes a console; the GUI distribution does not.
+
+The outputs are kept separate:
+
+- `dist/cmd/luhx-cmd-win.zip` and `dist/cmd/luhx-cmd-1.0.msi`
+- `dist/gui/luhx-gui-win.zip` and `dist/gui/luhx-gui-1.0.msi`
+
 The graphical interface saves and restores the positions and sizes of its windows,
 including dialogs and the folder chooser, in `config.ini` in the application's
 working directory. The main window, search results, and indexing monitor are
