@@ -15,6 +15,17 @@ mvn clean package
 
 The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are copied to `dist/lib/`.
 
+## API documentation
+
+Generate the HTML Javadocs with:
+
+```shell
+mvn javadoc:javadoc
+```
+
+Open `target/site/apidocs/index.html` to browse the API. The package also attaches
+a Javadoc JAR when building with `mvn package`.
+
 ## Command-line usage
 
 Both commands take the folder to index or search. The index is stored in a `.luhx` subfolder inside it.

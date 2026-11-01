@@ -1,7 +1,19 @@
 package br.com.pointel.luhx;
 
+/**
+ * Provides small utility operations for arrays.
+ */
 public class WizArray {
 
+    /**
+     * Checks whether an array contains a value equal to the target.
+     *
+     * @param target value to find
+     * @param array values to search
+     * @param <T> type of the target and array values
+     * @return {@code true} if an equal value is present; {@code false} if the
+     *         target or array is null or no value matches
+     */
     @SafeVarargs
     public static <T> boolean has(T target, T... array) {
         if (target == null || array == null) {
@@ -16,4 +28,3 @@ public class WizArray {
     }
 
 }
-

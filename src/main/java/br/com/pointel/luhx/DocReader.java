@@ -57,10 +57,10 @@ public class DocReader {
     }
 
     /**
-     * Counts the total number of pages in the document.
-     * Note: Currently, only PDF files support physical page counting.
+     * Counts the pages, sheets, or slides reported for the document format.
+     * Plain-text documents report one page; unsupported formats report zero.
      *
-     * @return the number of pages, or 0 if unsupported
+     * @return the page, sheet, or slide count, or 0 if the format is unsupported
      * @throws Exception if an error occurs reading the document metadata
      */
     public Integer countPages() throws Exception {

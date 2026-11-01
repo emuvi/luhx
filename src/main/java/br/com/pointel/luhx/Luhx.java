@@ -26,34 +26,49 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * Public API for indexing and searching supported documents.
+ * Indexes supported documents in a folder and searches their extracted content.
+ *
+ * <p>The index is stored in a {@value #INDEX_DIR_NAME} subdirectory of the
+ * indexed folder. Supported files are discovered and read by {@link DocReader}.
+ * This class also provides the command-line entry point for indexing and search.
  */
 public class Luhx {
 
+    /** Name of the hidden directory that stores an index. */
     public static final String INDEX_DIR_NAME = ".luhx";
+
+    /** Base name of the H2 database file that stores an index. */
     public static final String DB_NAME = "index";
 
     /**
-     * Estatísticas da execução do processo de indexação/atualização.
+     * Counts the files created, updated, removed, or left unchanged in an indexing run.
      *
-     * @param created   quantidade de novos arquivos indexados
-     * @param modified  quantidade de arquivos modificados atualizados no índice
-     * @param deleted   quantidade de arquivos excluídos removidos do índice
-     * @param unchanged quantidade de arquivos que não sofreram alteração
+     * @param created   number of new files added to the index
+     * @param modified  number of changed files reindexed
+     * @param deleted   number of missing files removed from the index
+     * @param unchanged number of files that did not need reindexing
      */
     public record IndexStats(int created, int modified, int deleted, int unchanged) {}
 
     /**
-     * Resultado de um arquivo encontrado na busca.
+     * A file matched by a search, together with its path and relevance score.
      *
-     * @param file         caminho absoluto do arquivo encontrado
-     * @param relativePath caminho relativo do arquivo dentro da pasta indexada
-     * @param score        pontuação de relevância (BM25) calculada pelo Lucene
+     * @param file         normalized path to the matched file
+     * @param relativePath path relative to the indexed folder, using forward slashes
+     * @param score        relevance score calculated by Lucene's BM25 similarity
      */
     public record SearchResult(Path file, String relativePath, float score) {}
 
     private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
 
+    /**
+     * Runs the command-line interface.
+     *
+     * <p>Accepts {@code --index <path>} to create or update an index, or
+     * {@code --search <path> <term>...} to search an existing index.
+     *
+     * @param args command-line arguments
+     */
     public static void main(String[] args) {
         configureLogging();
         try {
@@ -166,6 +181,20 @@ public class Luhx {
         }
     }
 
+    /**
+     * Creates or updates the index for a folder.
+     *
+     * <p>Supported files are scanned recursively, excluding the index directory.
+     * New files are indexed, files whose size or modification time changed are
+     * reindexed, and entries for files that are no longer present are removed.
+     *
+     * @param folderPath folder to index
+     * @return counts of created, modified, deleted, and unchanged files
+     * @throws IllegalArgumentException if {@code folderPath} is null, does not exist,
+     *                                  or is not a directory
+     * @throws Exception if the index cannot be created or updated, or a supported
+     *                   file cannot be read
+     */
     public static IndexStats indexFolder(Path folderPath) throws Exception {
         if (folderPath == null || !Files.exists(folderPath) || !Files.isDirectory(folderPath)) {
             throw new IllegalArgumentException("O caminho informado não é uma pasta válida: " + folderPath);
@@ -282,6 +311,20 @@ public class Luhx {
         return map;
     }
 
+    /**
+     * Searches the index associated with a folder.
+     *
+     * <p>Results are ordered by descending BM25 score, with relative paths used
+     * to break ties. When multiple non-empty terms are supplied without Boolean
+     * operators, they are joined with {@code AND}. An absent index or an empty
+     * query produces an empty list.
+     *
+     * @param folderPath folder containing the index
+     * @param keys search terms or a Lucene query, optionally including Boolean operators
+     * @return matching files, or an empty list if no index or query is available
+     * @throws IllegalArgumentException if {@code folderPath} is null
+     * @throws Exception if the index cannot be opened or the query cannot be executed
+     */
     public static List<SearchResult> searchFolder(Path folderPath, String... keys) throws Exception {
         if (folderPath == null) {
             throw new IllegalArgumentException("O caminho da pasta não pode ser nulo.");
