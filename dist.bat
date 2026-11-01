@@ -20,6 +20,7 @@ echo [1/7] Cleaning previous intermediates...
 for %%D in ("%INPUT%" "%RUNTIME%" "%APP%" "%DIST%\installer" "%DIST%\installer-temp") do if exist %%D rmdir /s /q %%D
 if exist "%DIST%\modules.txt" del /q "%DIST%\modules.txt"
 if exist "%DIST%\%NAME%-win.zip" del /q "%DIST%\%NAME%-win.zip"
+if exist "%DIST%\%NAME%-1.0.msi" del /q "%DIST%\%NAME%-1.0.msi"
 
 echo [2/7] Building jar and dependencies with Maven...
 call mvn -q -B package -DskipTests -Dmaven.javadoc.skip=true
@@ -51,13 +52,12 @@ rem jpackage on JDK 21 requires WiX 3.x (candle/light).
 where candle >nul 2>&1
 if errorlevel 1 if exist "%ProgramFiles(x86)%\WiX Toolset v3.14\bin\candle.exe" set "PATH=%ProgramFiles(x86)%\WiX Toolset v3.14\bin;%PATH%"
 where candle >nul 2>&1 || (echo ERROR: WiX 3.x not found.& exit /b 1)
-if exist "%DIST%\installer" rmdir /s /q "%DIST%\installer"
-jpackage --type msi --name %NAME% --app-version 1.0 --app-image "%APP%\%NAME%" --dest "%DIST%\installer" --icon "%~dp0design\luhx.ico" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --vendor pointel --install-dir %NAME% --win-upgrade-uuid 5b0c3f0e-8f6a-4c1d-9a57-3e2d7c1a4b90 --temp "%DIST%\installer-temp"
+jpackage --type msi --name %NAME% --app-version 1.0 --app-image "%APP%\%NAME%" --dest "%DIST%" --icon "%~dp0design\luhx.ico" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --vendor pointel --install-dir %NAME% --win-upgrade-uuid 5b0c3f0e-8f6a-4c1d-9a57-3e2d7c1a4b90 --temp "%DIST%\installer"
 if errorlevel 1 (echo ERROR: MSI creation failed.& exit /b 1)
 
 echo.
 echo Done.
 echo   Application: %APP%\%NAME%\%NAME%.exe
 echo   Archive:     %DIST%\%NAME%-win.zip
-echo   Installer:   %DIST%\installer\%NAME%-1.0.msi
+echo   Installer:   %DIST%\%NAME%-1.0.msi
 endlocal
