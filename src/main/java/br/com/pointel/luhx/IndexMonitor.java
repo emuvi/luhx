@@ -35,7 +35,7 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
      * @param folder folder being indexed
      */
     public IndexMonitor(Window owner, Path folder) {
-        super("Indexing " + folder);
+        super("Indexing " + folder.getFileName());
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         bar.setIndeterminate(true);
