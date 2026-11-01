@@ -21,6 +21,9 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 
 /**
  * Indexes supported documents in a folder and searches their extracted content.
@@ -63,7 +66,9 @@ public class Luhx {
 
     /**
      * Observes the progress of an indexing run. All methods are optional and are
-     * called on the indexing thread, so implementations should return quickly.
+     * called one at a time (never concurrently), but files are processed by a pool
+     * of worker threads, so {@code onFile} may run on any of them and in any order.
+     * Implementations should return quickly.
      */
     public interface IndexObserver {
 
@@ -85,6 +90,8 @@ public class Luhx {
         /** Called once when the run stopped early; stats cover the files processed so far. */
         default void onCancel(IndexStats stats) {}
     }
+
+    private record Found(String relPath, File file) {}
 
     private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
 
@@ -170,6 +177,7 @@ public class Luhx {
 
             int[] counts = new int[4]; // [0]=created, [1]=modified, [2]=deleted, [3]=unchanged
             boolean[] cancelled = new boolean[1];
+            List<Found> found = new ArrayList<>();
 
             String insertSql = "INSERT INTO DOCUMENTS (FILE_PATH, FILE_NAME, LAST_MODIFIED, FILE_SIZE, CONTENT) VALUES (?, ?, ?, ?, ?)";
             String updateSql = "UPDATE DOCUMENTS SET FILE_NAME = ?, LAST_MODIFIED = ?, FILE_SIZE = ?, CONTENT = ? WHERE ID = ?";
@@ -202,44 +210,88 @@ public class Luhx {
                         String relPath = normalizedFolder.relativize(filePath).toString().replace('\\', '/');
                         seenPaths.add(relPath);
 
-                        long lastModified = file.lastModified();
-                        long fileSize = file.length();
-                        DocMeta existing = existingDocs.get(relPath);
-
-                        try {
-                            if (existing == null) {
-                                String content = extractText(file);
-                                insertStmt.setString(1, relPath);
-                                insertStmt.setString(2, file.getName());
-                                insertStmt.setLong(3, lastModified);
-                                insertStmt.setLong(4, fileSize);
-                                insertStmt.setString(5, content);
-                                insertStmt.executeUpdate();
-                                counts[0]++;
-                                obs.onFile(relPath, IndexAction.CREATED);
-                            } else if (existing.lastModified() != lastModified || existing.fileSize() != fileSize) {
-                                String content = extractText(file);
-                                updateStmt.setString(1, file.getName());
-                                updateStmt.setLong(2, lastModified);
-                                updateStmt.setLong(3, fileSize);
-                                updateStmt.setString(4, content);
-                                updateStmt.setLong(5, existing.id());
-                                updateStmt.executeUpdate();
-                                counts[1]++;
-                                obs.onFile(relPath, IndexAction.MODIFIED);
-                            } else {
-                                counts[3]++;
-                                obs.onFile(relPath, IndexAction.UNCHANGED);
-                            }
-                        } catch (Exception e) {
-                            obs.onFile(relPath, IndexAction.FAILED);
-                            obs.onError(relPath, e);
-                            throw new IOException("Failed to index " + relPath, e);
-                        }
+                        found.add(new Found(relPath, file));
                         return FileVisitResult.CONTINUE;
                     }
 
                 });
+
+                if (!cancelled[0]) {
+                    int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(),
+                            Math.max(1, found.size())));
+                    ExecutorService pool = Executors.newFixedThreadPool(threads);
+                    Object lock = new Object();
+                    Exception[] failure = new Exception[1];
+                    try {
+                        List<Future<?>> futures = new ArrayList<>();
+                        for (Found item : found) {
+                            futures.add(pool.submit(() -> {
+                                synchronized (lock) {
+                                    if (failure[0] != null) {
+                                        return;
+                                    }
+                                    if (cancelled[0] || obs.isCancelled()) {
+                                        cancelled[0] = true;
+                                        return;
+                                    }
+                                }
+                                String relPath = item.relPath();
+                                File file = item.file();
+                                long lastModified = file.lastModified();
+                                long fileSize = file.length();
+                                DocMeta existing = existingDocs.get(relPath);
+                                try {
+                                    boolean changed = existing != null
+                                            && (existing.lastModified() != lastModified || existing.fileSize() != fileSize);
+                                    String content = (existing == null || changed) ? extractText(file) : null;
+                                    synchronized (lock) {
+                                        if (failure[0] != null) {
+                                            return;
+                                        }
+                                        if (existing == null) {
+                                            insertStmt.setString(1, relPath);
+                                            insertStmt.setString(2, file.getName());
+                                            insertStmt.setLong(3, lastModified);
+                                            insertStmt.setLong(4, fileSize);
+                                            insertStmt.setString(5, content);
+                                            insertStmt.executeUpdate();
+                                            counts[0]++;
+                                            obs.onFile(relPath, IndexAction.CREATED);
+                                        } else if (changed) {
+                                            updateStmt.setString(1, file.getName());
+                                            updateStmt.setLong(2, lastModified);
+                                            updateStmt.setLong(3, fileSize);
+                                            updateStmt.setString(4, content);
+                                            updateStmt.setLong(5, existing.id());
+                                            updateStmt.executeUpdate();
+                                            counts[1]++;
+                                            obs.onFile(relPath, IndexAction.MODIFIED);
+                                        } else {
+                                            counts[3]++;
+                                            obs.onFile(relPath, IndexAction.UNCHANGED);
+                                        }
+                                    }
+                                } catch (Exception e) {
+                                    synchronized (lock) {
+                                        if (failure[0] == null) {
+                                            failure[0] = new IOException("Failed to index " + relPath, e);
+                                            obs.onFile(relPath, IndexAction.FAILED);
+                                            obs.onError(relPath, e);
+                                        }
+                                    }
+                                }
+                            }));
+                        }
+                        for (Future<?> future : futures) {
+                            future.get();
+                        }
+                    } finally {
+                        pool.shutdownNow();
+                    }
+                    if (failure[0] != null) {
+                        throw (IOException) failure[0];
+                    }
+                }
 
                 // Skipped when cancelled: unseen paths would wrongly look deleted.
                 if (!cancelled[0]) {
