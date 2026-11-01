@@ -47,7 +47,7 @@ class LuhxIntegrationTest {
         assertEquals(0, stats.deleted());
         assertEquals(0, stats.unchanged());
 
-        Path dbFile = tempDir.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".mv.db");
+        Path dbFile = tempDir.resolve(Luhx.INDEX_DIR_NAME).resolve(Luhx.DB_NAME + ".h2.db");
         assertTrue(Files.exists(dbFile), "The H2 database file should be saved in the folder itself");
 
         List<Luhx.SearchResult> bm25Results = Luhx.searchFolder(tempDir, "BM25");

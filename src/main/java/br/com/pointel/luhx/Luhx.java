@@ -303,7 +303,7 @@ public class Luhx {
             throw new IllegalArgumentException("Folder path cannot be null.");
         }
         Path normalizedFolder = folderPath.toAbsolutePath().normalize();
-        Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".mv.db");
+        Path dbFile = normalizedFolder.resolve(INDEX_DIR_NAME).resolve(DB_NAME + ".h2.db");
         if (!Files.exists(dbFile)) {
             return Collections.emptyList();
         }
