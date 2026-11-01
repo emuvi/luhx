@@ -19,7 +19,7 @@ for %%T in (java jdeps jlink jpackage mvn) do (
 echo [1/7] Cleaning previous intermediates...
 for %%D in ("%INPUT%" "%RUNTIME%" "%APP%" "%DIST%\installer" "%DIST%\installer-temp") do if exist %%D rmdir /s /q %%D
 if exist "%DIST%\modules.txt" del /q "%DIST%\modules.txt"
-if exist "%DIST%\%NAME%-windows.zip" del /q "%DIST%\%NAME%-windows.zip"
+if exist "%DIST%\%NAME%-win.zip" del /q "%DIST%\%NAME%-win.zip"
 
 echo [2/7] Building jar and dependencies with Maven...
 call mvn -q -B package -DskipTests -Dmaven.javadoc.skip=true
@@ -30,24 +30,20 @@ mkdir "%INPUT%\lib" || exit /b 1
 copy /y "%DIST%\%NAME%.jar" "%INPUT%\" >nul || exit /b 1
 copy /y "%DIST%\lib\*.jar" "%INPUT%\lib\" >nul || exit /b 1
 
-echo [4/7] Detecting required Java modules with jdeps...
-set "MODULES="
-for /f "delims=" %%M in ('jdeps --multi-release 21 --ignore-missing-deps --print-module-deps --class-path "%INPUT%\lib\*" "%INPUT%\%NAME%.jar"') do set "MODULES=%%M"
-if not defined MODULES (echo ERROR: jdeps failed.& exit /b 1)
-rem Extra modules commonly needed at runtime by the libraries (reflection, charsets, crypto, jar handling).
-set "MODULES=%MODULES%,java.sql,java.naming,java.xml,java.desktop,java.management,jdk.unsupported,jdk.charsets,jdk.crypto.ec,jdk.zipfs"
-echo %MODULES%> "%DIST%\modules.txt"
-echo Modules: %MODULES%
+echo [4/7] Listing all modules of the JDK...
+for %%J in (jlink.exe) do set "JDKBIN=%%~dp$PATH:J"
+"%JDKBIN%java" --list-modules > "%DIST%\modules.txt"
+if errorlevel 1 (echo ERROR: could not list modules.& exit /b 1)
 
-echo [5/7] Creating trimmed Java runtime with jlink...
-jlink --add-modules %MODULES% --output "%RUNTIME%" --strip-debug --no-header-files --no-man-pages --compress zip-6
+echo [5/7] Creating full Java runtime with jlink...
+jlink --add-modules ALL-MODULE-PATH --output "%RUNTIME%" --strip-debug --no-header-files --no-man-pages --compress zip-6
 if errorlevel 1 (echo ERROR: jlink failed.& exit /b 1)
 
 echo [6/7] Creating application image with jpackage...
 jpackage --type app-image --name %NAME% --input "%INPUT%" --main-jar %NAME%.jar --runtime-image "%RUNTIME%" --dest "%APP%" --win-console --icon "%~dp0design\luhx.ico"
 if errorlevel 1 (echo ERROR: jpackage failed.& exit /b 1)
 
-powershell -NoProfile -Command "Compress-Archive -Path '%APP%\%NAME%' -DestinationPath '%DIST%\%NAME%-windows.zip' -Force"
+powershell -NoProfile -Command "Compress-Archive -Path '%APP%\%NAME%' -DestinationPath '%DIST%\%NAME%-win.zip' -Force"
 if errorlevel 1 (echo ERROR: zip failed.& exit /b 1)
 
 echo [7/7] Creating MSI installer with WiX...
@@ -62,6 +58,6 @@ if errorlevel 1 (echo ERROR: MSI creation failed.& exit /b 1)
 echo.
 echo Done.
 echo   Application: %APP%\%NAME%\%NAME%.exe
-echo   Archive:     %DIST%\%NAME%-windows.zip
+echo   Archive:     %DIST%\%NAME%-win.zip
 echo   Installer:   %DIST%\installer\%NAME%-1.0.msi
 endlocal
