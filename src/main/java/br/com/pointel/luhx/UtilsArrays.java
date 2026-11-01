@@ -3,7 +3,7 @@ package br.com.pointel.luhx;
 /**
  * Provides small utility operations for arrays.
  */
-public class WizArray {
+public class UtilsArrays {
 
     /**
      * Checks whether an array contains a value equal to the target.

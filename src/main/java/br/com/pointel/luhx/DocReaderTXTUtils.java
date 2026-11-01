@@ -31,7 +31,7 @@ public class DocReaderTXTUtils {
      * @return true if the file name has a recognized plaintext extension
      */
     public static boolean isTXTFile(String fileName) {
-        return WizArray.has(FilenameUtils.getExtension(fileName).toLowerCase(), TXT_EXTENSIONS);
+        return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), TXT_EXTENSIONS);
     }
     /**
      * Retrieves all registered plaintext extensions.

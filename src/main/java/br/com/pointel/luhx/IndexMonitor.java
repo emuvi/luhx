@@ -8,7 +8,7 @@ import java.nio.file.Path;
 import javax.swing.BorderFactory;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
-import javax.swing.JDialog;
+import javax.swing.JFrame;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JPanel;
@@ -17,7 +17,7 @@ import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
 /** Non-modal window that shows the live progress of an indexing run. */
-public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
+public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
 
     private final DefaultListModel<String> log = new DefaultListModel<>();
     private final JList<String> logList = new JList<>(log);
@@ -35,7 +35,7 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
      * @param folder folder being indexed
      */
     public IndexMonitor(Window owner, Path folder) {
-        super(owner, "Indexing " + folder, ModalityType.MODELESS);
+        super("Indexing " + folder);
         setDefaultCloseOperation(DISPOSE_ON_CLOSE);
 
         bar.setIndeterminate(true);
@@ -47,23 +47,23 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
             append("Stopping...");
         });
 
-        JPanel top = new JPanel(new BorderLayout(0, UiSpacing.GAP));
+        JPanel top = new JPanel(new BorderLayout(0, WindowConfig.GAP));
         top.add(counters, BorderLayout.NORTH);
         top.add(bar, BorderLayout.SOUTH);
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, UiSpacing.GAP, 0));
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, WindowConfig.GAP, 0));
         bottom.add(stop);
         bottom.add(close);
 
-        JPanel content = new JPanel(new BorderLayout(0, UiSpacing.GAP));
+        JPanel content = new JPanel(new BorderLayout(0, WindowConfig.GAP));
         content.setBorder(BorderFactory.createEmptyBorder(
-                UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING));
+                WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING));
         content.add(top, BorderLayout.NORTH);
         content.add(new JScrollPane(logList), BorderLayout.CENTER);
         content.add(bottom, BorderLayout.SOUTH);
         setContentPane(content);
         setPreferredSize(new Dimension(640, 420));
         pack();
-        setLocationRelativeTo(owner);
+        WindowConfig.track(this, "indexMonitor", owner);
     }
 
     private void updateCounters() {

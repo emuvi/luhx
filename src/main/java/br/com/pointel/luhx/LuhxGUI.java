@@ -52,8 +52,8 @@ public class LuhxGUI extends JFrame {
         search.addActionListener(e -> search());
         searchField.addActionListener(e -> search());
 
-        JPanel top = new JPanel(new BorderLayout(UiSpacing.GAP, 0));
-        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, UiSpacing.GAP, 0));
+        JPanel top = new JPanel(new BorderLayout(WindowConfig.GAP, 0));
+        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, WindowConfig.GAP, 0));
         leftButtons.add(add);
         leftButtons.add(remove);
         leftButtons.add(index);
@@ -74,15 +74,15 @@ public class LuhxGUI extends JFrame {
             }
         });
 
-        JPanel content = new JPanel(new BorderLayout(0, UiSpacing.GAP));
+        JPanel content = new JPanel(new BorderLayout(0, WindowConfig.GAP));
         content.setBorder(BorderFactory.createEmptyBorder(
-                UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING));
+                WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING));
         content.add(top, BorderLayout.NORTH);
         content.add(new JScrollPane(list), BorderLayout.CENTER);
         setContentPane(content);
         setPreferredSize(new Dimension(760, 380));
         pack();
-        setLocationRelativeTo(null);
+        WindowConfig.track(this, "main");
         loadPaths();
     }
 
@@ -195,7 +195,7 @@ public class LuhxGUI extends JFrame {
             @Override
             protected void done() {
                 try {
-                    showResults(get());
+                    showResults(get(), text);
                 } catch (Exception ex) {
                     Throwable cause = ex.getCause() != null ? ex.getCause() : ex;
                     JOptionPane.showMessageDialog(LuhxGUI.this, "Search failed: " + cause.getMessage(),
@@ -205,9 +205,10 @@ public class LuhxGUI extends JFrame {
         }.execute();
     }
 
-    private void showResults(List<Luhx.SearchResult> results) {
+    private void showResults(List<Luhx.SearchResult> results, String query) {
         if (results.isEmpty()) {
-            JOptionPane.showMessageDialog(this, "No files found.");
+            JOptionPane.showMessageDialog(this, "No files found.",
+                    "No results for: " + query, JOptionPane.INFORMATION_MESSAGE);
             return;
         }
         List<String> lines = new ArrayList<>();
@@ -228,8 +229,12 @@ public class LuhxGUI extends JFrame {
         });
         JScrollPane pane = new JScrollPane(view);
         pane.setPreferredSize(new Dimension(700, 300));
-        JOptionPane.showMessageDialog(this, pane, "Results (" + results.size() + ")",
-                JOptionPane.PLAIN_MESSAGE);
+        JFrame resultsWindow = new JFrame("Results for: " + query + " (" + results.size() + ")");
+        resultsWindow.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
+        resultsWindow.setContentPane(pane);
+        resultsWindow.pack();
+        WindowConfig.track(resultsWindow, "results");
+        resultsWindow.setVisible(true);
     }
 
     private void openPath(Path path) {

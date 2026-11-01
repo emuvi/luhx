@@ -31,7 +31,7 @@ public class DocReaderPDFUtils {
      * @return true if the file name has a recognized PDF extension
      */
     public static boolean isPDFFile(String fileName) {
-        return WizArray.has(FilenameUtils.getExtension(fileName).toLowerCase(), PDF_EXTENSIONS);
+        return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), PDF_EXTENSIONS);
     }
     /**
      * Retrieves all registered PDF extensions.

@@ -9,23 +9,23 @@ class WizArrayTest {
 
     @Test
     void shouldReturnTrueWhenElementExistsInArray() {
-        assertTrue(WizArray.has("pdf", "txt", "pdf", "docx"));
-        assertTrue(WizArray.has(42, 10, 20, 42, 99));
+        assertTrue(UtilsArrays.has("pdf", "txt", "pdf", "docx"));
+        assertTrue(UtilsArrays.has(42, 10, 20, 42, 99));
     }
 
     @Test
     void shouldReturnFalseWhenElementDoesNotExistInArray() {
-        assertFalse(WizArray.has("xlsx", "txt", "pdf", "docx"));
-        assertFalse(WizArray.has("PDF", "txt", "pdf", "docx"));
+        assertFalse(UtilsArrays.has("xlsx", "txt", "pdf", "docx"));
+        assertFalse(UtilsArrays.has("PDF", "txt", "pdf", "docx"));
     }
 
     @Test
     void shouldHandleNullAndEmptyInputsSafely() {
-        assertFalse(WizArray.has(null, "a", "b"));
-        assertFalse(WizArray.has("a", (String[]) null));
-        assertFalse(WizArray.has("a"));
-        assertFalse(WizArray.has("a", null, "b"));
-        assertTrue(WizArray.has("b", null, "b"));
+        assertFalse(UtilsArrays.has(null, "a", "b"));
+        assertFalse(UtilsArrays.has("a", (String[]) null));
+        assertFalse(UtilsArrays.has("a"));
+        assertFalse(UtilsArrays.has("a", null, "b"));
+        assertTrue(UtilsArrays.has("b", null, "b"));
     }
 
 }

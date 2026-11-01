@@ -38,7 +38,7 @@ public class DocReaderMSOUtils {
      * @return true if the file is a Microsoft Word document
      */
     public static boolean isMSWordFile(String fileName) {
-        return WizArray.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSWORD_EXTENSIONS);
+        return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSWORD_EXTENSIONS);
     }
 
     /**
@@ -58,7 +58,7 @@ public class DocReaderMSOUtils {
      * @return true if the file is a Microsoft PowerPoint document
      */
     public static boolean isMSPowerPointFile(String fileName) {
-        return WizArray.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSPOWERPOINT_EXTENSIONS);
+        return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSPOWERPOINT_EXTENSIONS);
     }
 
     /**
@@ -78,7 +78,7 @@ public class DocReaderMSOUtils {
      * @return true if the file is a Microsoft Excel document
      */
     public static boolean isMSExcelFile(String fileName) {
-        return WizArray.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSEXCEL_EXTENSIONS);
+        return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), MSEXCEL_EXTENSIONS);
     }
     /**
      * Combines all registered Microsoft Office extensions into a single list.

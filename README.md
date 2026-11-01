@@ -15,6 +15,11 @@ mvn clean package
 
 The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are copied to `dist/lib/`.
 
+The graphical interface saves and restores the positions and sizes of its windows,
+including dialogs and the folder chooser, in `config.ini` in the application's
+working directory. The main window, search results, and indexing monitor are
+independent maximizable windows.
+
 ## API documentation
 
 Generate the HTML Javadocs with:
