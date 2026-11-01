@@ -50,8 +50,8 @@ public class LuhxGUI extends JFrame {
         search.addActionListener(e -> search());
         searchField.addActionListener(e -> search());
 
-        JPanel top = new JPanel(new BorderLayout(4, 0));
-        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+        JPanel top = new JPanel(new BorderLayout(UiSpacing.GAP, 0));
+        JPanel leftButtons = new JPanel(new FlowLayout(FlowLayout.LEFT, UiSpacing.GAP, 0));
         leftButtons.add(add);
         leftButtons.add(remove);
         leftButtons.add(index);
@@ -72,8 +72,9 @@ public class LuhxGUI extends JFrame {
             }
         });
 
-        JPanel content = new JPanel(new BorderLayout(0, 4));
-        content.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
+        JPanel content = new JPanel(new BorderLayout(0, UiSpacing.GAP));
+        content.setBorder(BorderFactory.createEmptyBorder(
+                UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING));
         content.add(top, BorderLayout.NORTH);
         content.add(new JScrollPane(list), BorderLayout.CENTER);
         setContentPane(content);

@@ -2,6 +2,7 @@ package br.com.pointel.luhx;
 
 import java.awt.BorderLayout;
 import java.awt.Dimension;
+import java.awt.FlowLayout;
 import java.awt.Window;
 import java.nio.file.Path;
 import javax.swing.BorderFactory;
@@ -46,15 +47,16 @@ public class IndexMonitor extends JDialog implements Luhx.IndexObserver {
             append("Stopping...");
         });
 
-        JPanel top = new JPanel(new BorderLayout(0, 6));
+        JPanel top = new JPanel(new BorderLayout(0, UiSpacing.GAP));
         top.add(counters, BorderLayout.NORTH);
         top.add(bar, BorderLayout.SOUTH);
-        JPanel bottom = new JPanel();
+        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.CENTER, UiSpacing.GAP, 0));
         bottom.add(stop);
         bottom.add(close);
 
-        JPanel content = new JPanel(new BorderLayout(0, 8));
-        content.setBorder(BorderFactory.createEmptyBorder(12, 12, 12, 12));
+        JPanel content = new JPanel(new BorderLayout(0, UiSpacing.GAP));
+        content.setBorder(BorderFactory.createEmptyBorder(
+                UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING, UiSpacing.PADDING));
         content.add(top, BorderLayout.NORTH);
         content.add(new JScrollPane(logList), BorderLayout.CENTER);
         content.add(bottom, BorderLayout.SOUTH);
