@@ -187,7 +187,7 @@ public class LuhxGUI extends JFrame {
                     "Folder not indexed yet. Double-click it to index.");
             return;
         }
-        String[] keys = text.split("\\s+");
+        String[] keys = text.split("\\s+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)");
         new SwingWorker<List<Luhx.SearchResult>, Void>() {
             @Override
             protected List<Luhx.SearchResult> doInBackground() throws Exception {

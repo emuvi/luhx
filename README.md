@@ -81,7 +81,20 @@ Examples:
 java -jar dist/luhx.jar --index ./documents
 java -jar dist/luhx.jar --search ./documents lucene
 java -jar dist/luhx.jar --search ./documents lucene AND indexing
+java -jar dist/luhx.jar --search ./documents "lucene & indexing"
 ```
+
+### Boolean operators
+
+The command line and the graphical search box use the same Lucene query syntax. Besides the words `AND`, `OR` and `NOT`, these shortcuts are accepted:
+
+| Type | Meaning | Example |
+|------|---------|---------|
+| `&` or `&&` | `AND` | `lucene & indexing` |
+| `\|` or `\|\|` | `OR` | `lucene \| h2` |
+| `!` | `NOT` | `lucene !h2` |
+
+Text inside double quotes is left untouched, so `"rock & roll"` searches for that exact phrase. Other Lucene syntax (wildcards, fields, grouping with parentheses) is passed through as is. In the graphical interface, type the whole query in the search box; terms without an operator are combined with `AND`.
 
 ## Use as a library
 

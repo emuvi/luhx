@@ -21,6 +21,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
@@ -263,18 +264,23 @@ public class Luhx {
                                             obs.onFile(relPath, IndexAction.UNCHANGED);
                                         }
                                     }
-                                } catch (Exception e) {
-                                    synchronized (lock) {
-                                        System.err.println("Failed to index " + relPath + ": " + e);
-                                        e.printStackTrace(System.err);
-                                        obs.onFile(relPath, IndexAction.FAILED);
-                                        obs.onError(relPath, e);
+                                    } catch (Exception e) {
+                                        synchronized (lock) {
+                                            reportIndexFailure(relPath, e, obs);
+                                        }
                                     }
-                                }
                             }));
                         }
-                        for (Future<?> future : futures) {
-                            future.get();
+                        for (int i = 0; i < futures.size(); i++) {
+                            try {
+                                futures.get(i).get();
+                            } catch (ExecutionException e) {
+                                Throwable cause = e.getCause() != null ? e.getCause() : e;
+                                Exception error = cause instanceof Exception exception
+                                        ? exception
+                                        : new Exception("Index worker failed", cause);
+                                reportIndexFailure(found.get(i).relPath(), error, obs);
+                            }
                         }
                     } finally {
                         pool.shutdownNow();
@@ -307,6 +313,13 @@ public class Luhx {
     private static String extractText(File file) throws Exception {
         String text = new DocReader(file).read();
         return text != null ? text : "";
+    }
+
+    private static void reportIndexFailure(String relativePath, Exception error, IndexObserver observer) {
+        System.err.println("Failed to index " + relativePath + ": " + error);
+        error.printStackTrace(System.err);
+        observer.onFile(relativePath, IndexAction.FAILED);
+        observer.onError(relativePath, error);
     }
 
     private static Map<String, DocMeta> loadExistingDocs(Connection conn) throws SQLException {
@@ -415,11 +428,13 @@ public class Luhx {
         boolean hasBooleanOperators = false;
         for (String key : keys) {
             if (key != null && !key.isBlank()) {
-                String trimmed = key.trim();
+                String trimmed = normalizeOperators(key.trim());
                 nonEmpty.add(trimmed);
                 String upper = trimmed.toUpperCase();
                 if (upper.equals("AND") || upper.equals("OR") || upper.equals("NOT")
-                        || upper.contains(" AND ") || upper.contains(" OR ") || upper.contains(" NOT ")) {
+                        || upper.contains(" AND ") || upper.contains(" OR ") || upper.contains(" NOT ")
+                        || upper.startsWith("AND ") || upper.startsWith("OR ") || upper.startsWith("NOT ")
+                        || upper.endsWith(" AND") || upper.endsWith(" OR")) {
                     hasBooleanOperators = true;
                 }
             }
@@ -431,6 +446,39 @@ public class Luhx {
             return String.join(" ", nonEmpty);
         }
         return String.join(" AND ", nonEmpty);
+    }
+
+    /** Converts "&", "&&", "|", "||" and "!" outside quotes to Lucene AND, OR and NOT. */
+    static String normalizeOperators(String text) {
+        StringBuilder out = new StringBuilder();
+        boolean quoted = false;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (c == '\\' && i + 1 < text.length()) {
+                out.append(c).append(text.charAt(++i));
+                continue;
+            }
+            if (c == '"') {
+                quoted = !quoted;
+                out.append(c);
+                continue;
+            }
+            if (quoted) {
+                out.append(c);
+                continue;
+            }
+            if (c == '&' || c == '|') {
+                while (i + 1 < text.length() && text.charAt(i + 1) == c) {
+                    i++;
+                }
+                out.append(c == '&' ? " AND " : " OR ");
+            } else if (c == '!') {
+                out.append(" NOT ");
+            } else {
+                out.append(c);
+            }
+        }
+        return out.toString().trim().replaceAll("\\s+(?=(?:[^\"]*\"[^\"]*\")*[^\"]*$)", " ");
     }
 
 }

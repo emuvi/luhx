@@ -14,6 +14,7 @@ import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.List;
 import java.util.concurrent.CopyOnWriteArrayList;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -252,6 +253,42 @@ class LuhxIntegrationTest {
             assertEquals(1, Luhx.searchFolder(tempDir, "searchable").size());
             assertTrue(failedFiles.contains("broken.pdf"));
             assertTrue(errorBuffer.toString(StandardCharsets.UTF_8).contains("Failed to index broken.pdf"));
+        } finally {
+            System.setErr(originalErr);
+        }
+    }
+
+    @Test
+    void shouldContinueProcessingAfterAWorkerFailsUnexpectedly() throws Exception {
+        Files.writeString(tempDir.resolve("worker-error.txt"), "This worker will fail.");
+        Files.writeString(tempDir.resolve("valid.txt"), "A valid document with a searchable keyword.");
+        AtomicBoolean injectedFailure = new AtomicBoolean();
+        List<String> failedFiles = new CopyOnWriteArrayList<>();
+        PrintStream originalErr = System.err;
+        ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+        try {
+            System.setErr(new PrintStream(errorBuffer, true, StandardCharsets.UTF_8));
+
+            Luhx.IndexStats stats = Luhx.indexFolder(tempDir, new Luhx.IndexObserver() {
+                @Override
+                public void onFile(String relativePath, Luhx.IndexAction action) {
+                    if (relativePath.equals("worker-error.txt")
+                            && action == Luhx.IndexAction.CREATED
+                            && injectedFailure.compareAndSet(false, true)) {
+                        throw new AssertionError("Unexpected worker failure");
+                    }
+                }
+
+                @Override
+                public void onError(String relativePath, Exception error) {
+                    failedFiles.add(relativePath);
+                }
+            });
+
+            assertEquals(2, stats.created());
+            assertEquals(1, Luhx.searchFolder(tempDir, "searchable").size());
+            assertEquals(1, failedFiles.size());
+            assertTrue(errorBuffer.toString(StandardCharsets.UTF_8).contains("Failed to index worker-error.txt"));
         } finally {
             System.setErr(originalErr);
         }
