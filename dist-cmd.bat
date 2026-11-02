@@ -54,7 +54,7 @@ rem jpackage on JDK 21 requires WiX 3.x (candle/light).
 where candle >nul 2>&1
 if errorlevel 1 if exist "%ProgramFiles(x86)%\WiX Toolset v3.14\bin\candle.exe" set "PATH=%ProgramFiles(x86)%\WiX Toolset v3.14\bin;%PATH%"
 where candle >nul 2>&1 || (echo ERROR: WiX 3.x not found.& exit /b 1)
-jpackage --type msi --name %NAME% --app-version 1.0 --app-image "%APP%\%NAME%" --dest "%PACKAGE%" --icon "%~dp0design\luhx.ico" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --vendor pointel --install-dir %NAME% --win-upgrade-uuid 5b0c3f0e-8f6a-4c1d-9a57-3e2d7c1a4b90 --temp "%PACKAGE%\installer"
+jpackage --type msi --name %NAME% --app-version 1.0 --app-image "%APP%\%NAME%" --dest "%PACKAGE%" --icon "%~dp0design\luhx.ico" --win-menu --win-shortcut --win-dir-chooser --win-per-user-install --vendor pointel --install-dir pointel --win-upgrade-uuid 5b0c3f0e-8f6a-4c1d-9a57-3e2d7c1a4b90 --temp "%PACKAGE%\installer"
 if errorlevel 1 (echo ERROR: MSI creation failed.& exit /b 1)
 
 echo.
