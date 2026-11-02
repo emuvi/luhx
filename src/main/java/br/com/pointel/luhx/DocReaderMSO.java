@@ -2,6 +2,7 @@ package br.com.pointel.luhx;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
@@ -11,9 +12,10 @@ import org.apache.poi.hssf.extractor.ExcelExtractor;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
-import org.apache.poi.poifs.filesystem.POIFSFileSystem;
 import org.apache.poi.sl.extractor.SlideShowExtractor;
 import org.apache.poi.sl.usermodel.SlideShowFactory;
+import org.apache.poi.ss.usermodel.Workbook;
+import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xssf.extractor.XSSFExcelExtractor;
 import org.apache.poi.xssf.usermodel.XSSFWorkbook;
@@ -122,46 +124,22 @@ public class DocReaderMSO {
      * @throws Exception if an error occurs reading the file or format is unsupported
      */
     private String extractTextFromExcel() throws Exception {
-        if (path.getName().toLowerCase().endsWith(".xls")) {
-            return extractTextFromExcelOle();
-        } else if (path.getName().toLowerCase().endsWith(".xlsx")) {
-            return extractTextFromExcelXml();
-        } else {
-            throw new Exception("File type not expected: " + path.getName());
-        }
-    }
-
-    /**
-     * Extracts text from a legacy Microsoft Excel OLE2 document (.xls).
-     *
-     * @return the extracted raw text
-     * @throws Exception if an error occurs reading the file
-     */
-    private String extractTextFromExcelOle() throws Exception {
-        try (var fis = new FileInputStream(path)) {
-            try (var workBook = new HSSFWorkbook(new POIFSFileSystem(fis));
-                var extractor = new ExcelExtractor(workBook);) {
-                extractor.setFormulasNotResults(false);
-                extractor.setIncludeSheetNames(true);
-                return extractor.getText();
+        try (Workbook workbook = WorkbookFactory.create(path)) {
+            if (workbook instanceof HSSFWorkbook legacyWorkbook) {
+                try (var extractor = new ExcelExtractor(legacyWorkbook)) {
+                    extractor.setFormulasNotResults(false);
+                    extractor.setIncludeSheetNames(true);
+                    return extractor.getText();
+                }
             }
-        }
-    }
-
-    /**
-     * Extracts text from a modern Microsoft Excel OOXML document (.xlsx).
-     *
-     * @return the extracted raw text
-     * @throws Exception if an error occurs reading the file
-     */
-    private String extractTextFromExcelXml() throws Exception {
-        try (var fis = new FileInputStream(path)) {
-            try (var workbook = new XSSFWorkbook(fis);
-                 var extractor = new XSSFExcelExtractor(workbook)) {
-                extractor.setFormulasNotResults(false);
-                extractor.setIncludeSheetNames(true);
-                return extractor.getText();
+            if (workbook instanceof XSSFWorkbook xmlWorkbook) {
+                try (var extractor = new XSSFExcelExtractor(xmlWorkbook)) {
+                    extractor.setFormulasNotResults(false);
+                    extractor.setIncludeSheetNames(true);
+                    return extractor.getText();
+                }
             }
+            throw new IOException("Unsupported Excel workbook type: " + path.getName());
         }
     }
 
@@ -268,14 +246,8 @@ public class DocReaderMSO {
                 }
             }
         } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
-            if (path.getName().toLowerCase().endsWith(".xls")) {
-                try (var fis = new FileInputStream(path); var doc = new HSSFWorkbook(fis)) {
-                    return doc.getNumberOfSheets();
-                }
-            } else {
-                try (var fis = new FileInputStream(path); var doc = new XSSFWorkbook(fis)) {
-                    return doc.getNumberOfSheets();
-                }
+            try (Workbook workbook = WorkbookFactory.create(path)) {
+                return workbook.getNumberOfSheets();
             }
         } else if (DocReaderMSOUtils.isMSPowerPointFile(path)) {
             if (path.getName().toLowerCase().endsWith(".ppt")) {
@@ -388,16 +360,14 @@ public class DocReaderMSO {
                 }
             }
         } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
-            if (path.getName().toLowerCase().endsWith(".xls")) {
-                try (var fis = new FileInputStream(path); var doc = new HSSFWorkbook(fis)) {
+            try (Workbook workbook = WorkbookFactory.create(path)) {
+                if (workbook instanceof HSSFWorkbook doc) {
                     var info = doc.getSummaryInformation();
                     if (info == null) return null;
                     if ("author".equals(property)) return info.getAuthor();
                     if ("title".equals(property)) return info.getTitle();
                     if ("creationDate".equals(property)) return info.getCreateDateTime();
-                }
-            } else {
-                try (var fis = new FileInputStream(path); var doc = new XSSFWorkbook(fis)) {
+                } else if (workbook instanceof XSSFWorkbook doc) {
                     var props = doc.getProperties().getCoreProperties();
                     if (props == null) return null;
                     if ("author".equals(property)) return props.getCreator();

@@ -57,6 +57,14 @@ class DocReaderTest {
     }
 
     @Test
+    void shouldReplaceMalformedUtf8InPlainTextFiles() throws Exception {
+        Path txtPath = tempDir.resolve("malformed.txt");
+        Files.write(txtPath, new byte[] {'v', 'a', 'l', 'i', 'd', ' ', (byte) 0xC3, '(', ' ', 't', 'e', 'x', 't'});
+
+        assertEquals("valid \uFFFD( text", new DocReader(txtPath.toFile()).read());
+    }
+
+    @Test
     void shouldReadPdfFileThroughDocReader() throws Exception {
         File pdfFile = tempDir.resolve("document.pdf").toFile();
         try (PDDocument doc = new PDDocument()) {
@@ -122,6 +130,23 @@ class DocReaderTest {
         assertTrue(text.contains("Finance"));
         assertTrue(text.contains("Revenue"));
         assertTrue(text.contains("Quarterly"));
+        assertEquals(1, reader.countPages());
+    }
+
+    @Test
+    void shouldDetectExcelFormatWhenExtensionDoesNotMatch() throws Exception {
+        File xlsFile = tempDir.resolve("spreadsheet.xls").toFile();
+        try (XSSFWorkbook workbook = new XSSFWorkbook();
+             FileOutputStream out = new FileOutputStream(xlsFile)) {
+            var sheet = workbook.createSheet("Finance");
+            sheet.createRow(0).createCell(0).setCellValue("Revenue");
+            workbook.write(out);
+        }
+
+        DocReader reader = new DocReader(xlsFile);
+        String text = reader.read();
+        assertTrue(text.contains("Finance"));
+        assertTrue(text.contains("Revenue"));
         assertEquals(1, reader.countPages());
     }
 

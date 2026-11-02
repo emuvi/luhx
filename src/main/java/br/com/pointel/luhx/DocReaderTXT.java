@@ -2,6 +2,7 @@ package br.com.pointel.luhx;
 
 import java.io.File;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.StandardOpenOption;
 import java.nio.file.attribute.BasicFileAttributes;
@@ -43,7 +44,7 @@ public class DocReaderTXT {
      * @throws Exception if an I/O error occurs
      */
     public String read() throws Exception {
-        return Files.readString(file.toPath());
+        return new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8);
     }
 
     /**
@@ -54,7 +55,7 @@ public class DocReaderTXT {
      * @throws Exception if an I/O error occurs
      */
     public String read(Charset charset) throws Exception {
-        return Files.readString(file.toPath(), charset);
+        return new String(Files.readAllBytes(file.toPath()), charset);
     }
 
     /**
@@ -64,7 +65,7 @@ public class DocReaderTXT {
      * @throws Exception if an I/O error occurs
      */
     public List<String> readLines() throws Exception {
-        return Files.readAllLines(file.toPath());
+        return read().lines().toList();
     }
 
     /**
@@ -75,7 +76,7 @@ public class DocReaderTXT {
      * @throws Exception if an I/O error occurs
      */
     public List<String> readLines(Charset charset) throws Exception {
-        return Files.readAllLines(file.toPath(), charset);
+        return read(charset).lines().toList();
     }
 
     /**

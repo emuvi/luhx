@@ -25,6 +25,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 /**
  * Indexes supported documents in a folder and searches their extracted content.
@@ -283,7 +284,7 @@ public class Luhx {
                             }
                         }
                     } finally {
-                        pool.shutdownNow();
+                        shutdownAndAwait(pool);
                     }
                 }
 
@@ -307,6 +308,21 @@ public class Luhx {
                 obs.onFinish(stats);
             }
             return stats;
+        }
+    }
+
+    private static void shutdownAndAwait(ExecutorService pool) {
+        pool.shutdownNow();
+        boolean interrupted = false;
+        while (!pool.isTerminated()) {
+            try {
+                pool.awaitTermination(Long.MAX_VALUE, TimeUnit.NANOSECONDS);
+            } catch (InterruptedException e) {
+                interrupted = true;
+            }
+        }
+        if (interrupted) {
+            Thread.currentThread().interrupt();
         }
     }
 

@@ -69,6 +69,26 @@ class LuhxIntegrationTest {
     }
 
     @Test
+    void shouldContinueIndexingWhenOneOfficeFileIsEmpty() throws Exception {
+        Files.writeString(tempDir.resolve("first.txt"), "A searchable valid document.");
+        Files.writeString(tempDir.resolve("second.txt"), "Another searchable valid document.");
+        Files.createFile(tempDir.resolve("empty.docx"));
+        List<String> errors = new CopyOnWriteArrayList<>();
+        Luhx.IndexObserver observer = new Luhx.IndexObserver() {
+            @Override
+            public void onError(String relativePath, Exception error) {
+                errors.add(relativePath);
+            }
+        };
+
+        Luhx.IndexStats stats = Luhx.indexFolder(tempDir, observer);
+
+        assertEquals(new Luhx.IndexStats(2, 0, 0, 0), stats);
+        assertEquals(List.of("empty.docx"), errors);
+        assertEquals(2, Luhx.searchFolder(tempDir, "searchable").size());
+    }
+
+    @Test
     void shouldReturnSearchResultsInRankedPages() throws Exception {
         Files.writeString(tempDir.resolve("first.txt"), "ranking ranking ranking");
         Files.writeString(tempDir.resolve("second.txt"), "ranking ranking");
