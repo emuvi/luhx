@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import org.apache.poi.hssf.extractor.ExcelExtractor;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hwpf.HWPFDocument;
@@ -73,13 +74,14 @@ public class DocReaderMSO {
     public String read() throws Exception {
         if (DocReaderMSOUtils.isMSWordFile(path)) {
             return extractTextFromWord();
-        } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
-            return extractTextFromExcel();
-        } else if (DocReaderMSOUtils.isMSPowerPointFile(path)) {
-            return extractTextFromPowerPoint();
-        } else {
-            throw new Exception("File type not expected: " + path.getName());
         }
+        if (DocReaderMSOUtils.isMSExcelFile(path)) {
+            return extractTextFromExcel();
+        }
+        if (DocReaderMSOUtils.isMSPowerPointFile(path)) {
+            return extractTextFromPowerPoint();
+        }
+        throw new Exception("File type not expected: " + path.getName());
     }
 
     /**
@@ -89,13 +91,13 @@ public class DocReaderMSO {
      * @throws Exception if an error occurs reading the file or format is unsupported
      */
     private String extractTextFromWord() throws Exception {
-        if (path.getName().toLowerCase().endsWith(".doc")) {
+        if (hasExtension("doc")) {
             return extractTextFromWordOle();
-        } else if (path.getName().toLowerCase().endsWith(".docx")) {
-            return extractTextFromWordXml();
-        } else {
-            throw new Exception("File type not expected: " + path.getName());
         }
+        if (hasExtension("docx")) {
+            return extractTextFromWordXml();
+        }
+        throw new Exception("File type not expected: " + path.getName());
     }
 
     /**
@@ -212,13 +214,13 @@ public class DocReaderMSO {
      * @throws Exception if an error occurs reading the file or format is unsupported
      */
     private String extractTextFromPowerPoint() throws Exception {
-        if (path.getName().toLowerCase().endsWith(".ppt")) {
+        if (hasExtension("ppt")) {
             return extractTextFromPowerPointOle();
-        } else if (path.getName().toLowerCase().endsWith(".pptx")) {
-            return extractTextFromPowerPointXml();
-        } else {
-            throw new Exception("File type not expected: " + path.getName());
         }
+        if (hasExtension("pptx")) {
+            return extractTextFromPowerPointXml();
+        }
+        throw new Exception("File type not expected: " + path.getName());
     }
 
     /**
@@ -280,11 +282,7 @@ public class DocReaderMSO {
      * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
-        String full = read();
-        if (full.length() <= length) {
-            return full;
-        }
-        return full.substring(0, length);
+        return DocReaderUtils.preview(read(), length);
     }
 
     /**
@@ -296,46 +294,65 @@ public class DocReaderMSO {
      */
     public Integer countPages() throws Exception {
         if (DocReaderMSOUtils.isMSWordFile(path)) {
-            if (path.getName().toLowerCase().endsWith(".doc")) {
-                try (var fis = new FileInputStream(path); var doc = new HWPFDocument(fis)) {
-                    var info = doc.getSummaryInformation();
-                    return info == null ? 1 : info.getPageCount();
-                }
-            } else {
-                try (var fis = new FileInputStream(path); var doc = new XWPFDocument(fis)) {
-                    var props = doc.getProperties().getExtendedProperties();
-                    return props == null ? 1 : props.getPages();
-                }
+            return countWordPages();
+        }
+        if (DocReaderMSOUtils.isMSExcelFile(path)) {
+            return countExcelSheets();
+        }
+        if (DocReaderMSOUtils.isMSPowerPointFile(path)) {
+            return countPowerPointSlides();
+        }
+        return 1;
+    }
+
+    private int countWordPages() throws Exception {
+        if (hasExtension("doc")) {
+            try (var input = new FileInputStream(path); var document = new HWPFDocument(input)) {
+                var summary = document.getSummaryInformation();
+                return summary == null ? 1 : summary.getPageCount();
             }
-        } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
-            if (isXlsxFile()) {
-                try (OPCPackage pkg = OPCPackage.open(path, PackageAccess.READ)) {
-                    XSSFReader reader = new XSSFReader(pkg);
-                    Iterator<InputStream> sheets = reader.getSheetsData();
-                    int count = 0;
-                    while (sheets.hasNext()) {
-                        try (InputStream ignored = sheets.next()) {
-                            count++;
-                        }
-                    }
-                    return count;
-                }
-            }
+        }
+        try (var input = new FileInputStream(path); var document = new XWPFDocument(input)) {
+            var properties = document.getProperties().getExtendedProperties();
+            return properties == null ? 1 : properties.getPages();
+        }
+    }
+
+    private int countExcelSheets() throws Exception {
+        if (!isXlsxFile()) {
             try (Workbook workbook = WorkbookFactory.create(path)) {
                 return workbook.getNumberOfSheets();
             }
-        } else if (DocReaderMSOUtils.isMSPowerPointFile(path)) {
-            if (path.getName().toLowerCase().endsWith(".ppt")) {
-                try (var fis = new FileInputStream(path); var slideShow = SlideShowFactory.create(fis)) {
-                    return slideShow.getSlides().size();
+        }
+        try (OPCPackage pkg = OPCPackage.open(path, PackageAccess.READ)) {
+            XSSFReader reader = new XSSFReader(pkg);
+            Iterator<InputStream> sheets = reader.getSheetsData();
+            int count = 0;
+            while (sheets.hasNext()) {
+                try (InputStream ignored = sheets.next()) {
+                    count++;
                 }
-            } else if (path.getName().toLowerCase().endsWith(".pptx")) {
-                try (var fis = new FileInputStream(path); var slideShow = new XMLSlideShow(fis)) {
-                    return slideShow.getSlides().size();
-                }
+            }
+            return count;
+        }
+    }
+
+    private int countPowerPointSlides() throws Exception {
+        if (hasExtension("ppt")) {
+            try (var input = new FileInputStream(path); var slideShow = SlideShowFactory.create(input)) {
+                return slideShow.getSlides().size();
+            }
+        }
+        if (hasExtension("pptx")) {
+            try (var input = new FileInputStream(path); var slideShow = new XMLSlideShow(input)) {
+                return slideShow.getSlides().size();
             }
         }
         return 1;
+    }
+
+    private boolean hasExtension(String extension) {
+        return path.getName().toLowerCase(Locale.ROOT).endsWith("." + extension);
     }
 
     /**
@@ -345,9 +362,7 @@ public class DocReaderMSO {
      * @throws Exception if an error occurs
      */
     public int getWordCount() throws Exception {
-        String full = read();
-        if (full == null || full.trim().isEmpty()) return 0;
-        return full.trim().split("\\s+").length;
+        return DocReaderUtils.wordCount(read());
     }
 
     /**

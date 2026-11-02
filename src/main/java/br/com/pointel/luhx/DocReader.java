@@ -14,6 +14,13 @@ import org.apache.commons.io.FilenameUtils;
  */
 public class DocReader {
 
+    private enum Format {
+        PDF,
+        OFFICE,
+        TEXT,
+        UNSUPPORTED
+    }
+
     /**
      * Checks if any of the underlying specialized readers can parse this file.
      *
@@ -28,6 +35,19 @@ public class DocReader {
 
     /** The underlying document file. */
     private final File file;
+
+    private Format format() {
+        if (DocReaderPDF.canRead(file)) {
+            return Format.PDF;
+        }
+        if (DocReaderMSO.canRead(file)) {
+            return Format.OFFICE;
+        }
+        if (DocReaderTXT.canRead(file)) {
+            return Format.TEXT;
+        }
+        return Format.UNSUPPORTED;
+    }
 
     /**
      * Constructs a unified document reader for the given file.
@@ -45,15 +65,12 @@ public class DocReader {
      * @throws Exception if an error occurs during extraction
      */
     public String read() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).read();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).read();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).read();
-        } else {
-            return "";
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).read();
+            case OFFICE -> new DocReaderMSO(file).read();
+            case TEXT -> new DocReaderTXT(file).read();
+            case UNSUPPORTED -> "";
+        };
     }
 
     /**
@@ -64,15 +81,12 @@ public class DocReader {
      * @throws Exception if an error occurs reading the document metadata
      */
     public Integer countPages() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).countPages();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).countPages();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).countPages();
-        } else {
-            return 0;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).countPages();
+            case OFFICE -> new DocReaderMSO(file).countPages();
+            case TEXT -> new DocReaderTXT(file).countPages();
+            case UNSUPPORTED -> 0;
+        };
     }
 
     /**
@@ -85,15 +99,10 @@ public class DocReader {
      * @throws Exception if an error occurs during rendering
      */
     public BufferedImage getPageAsImage(int pageNumber, int dpi) throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getPageAsImage(pageNumber, dpi);
-        } else if (DocReaderMSO.canRead(file)) {
-            return null;
-        } else if (DocReaderTXT.canRead(file)) {
-            return null;
-        } else {
-            return null;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getPageAsImage(pageNumber, dpi);
+            case OFFICE, TEXT, UNSUPPORTED -> null;
+        };
     }
 
     /**
@@ -148,15 +157,12 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public List<String> readLines() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).readLines();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).readLines();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).readLines();
-        } else {
-            return new ArrayList<>();
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).readLines();
+            case OFFICE -> new DocReaderMSO(file).readLines();
+            case TEXT -> new DocReaderTXT(file).readLines();
+            case UNSUPPORTED -> new ArrayList<>();
+        };
     }
 
     /**
@@ -168,15 +174,12 @@ public class DocReader {
      * @throws IndexOutOfBoundsException if {@code length} is negative and the format is supported
      */
     public String readPreview(int length) throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).readPreview(length);
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).readPreview(length);
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).readPreview(length);
-        } else {
-            return "";
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).readPreview(length);
+            case OFFICE -> new DocReaderMSO(file).readPreview(length);
+            case TEXT -> new DocReaderTXT(file).readPreview(length);
+            case UNSUPPORTED -> "";
+        };
     }
 
     /**
@@ -186,15 +189,12 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public int getWordCount() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getWordCount();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).getWordCount();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).getWordCount();
-        } else {
-            return 0;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getWordCount();
+            case OFFICE -> new DocReaderMSO(file).getWordCount();
+            case TEXT -> new DocReaderTXT(file).getWordCount();
+            case UNSUPPORTED -> 0;
+        };
     }
 
     /**
@@ -204,15 +204,12 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public int getCharCount() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getCharCount();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).getCharCount();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).getCharCount();
-        } else {
-            return 0;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getCharCount();
+            case OFFICE -> new DocReaderMSO(file).getCharCount();
+            case TEXT -> new DocReaderTXT(file).getCharCount();
+            case UNSUPPORTED -> 0;
+        };
     }
 
     /**
@@ -222,13 +219,11 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public String getAuthor() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getAuthor();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).getAuthor();
-        } else {
-            return null;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getAuthor();
+            case OFFICE -> new DocReaderMSO(file).getAuthor();
+            case TEXT, UNSUPPORTED -> null;
+        };
     }
 
     /**
@@ -238,13 +233,11 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public String getTitle() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getTitle();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).getTitle();
-        } else {
-            return null;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getTitle();
+            case OFFICE -> new DocReaderMSO(file).getTitle();
+            case TEXT, UNSUPPORTED -> null;
+        };
     }
 
     /**
@@ -255,15 +248,12 @@ public class DocReader {
      * @throws Exception if an error occurs
      */
     public Date getCreationDate() throws Exception {
-        if (DocReaderPDF.canRead(file)) {
-            return new DocReaderPDF(file).getCreationDate();
-        } else if (DocReaderMSO.canRead(file)) {
-            return new DocReaderMSO(file).getCreationDate();
-        } else if (DocReaderTXT.canRead(file)) {
-            return new DocReaderTXT(file).getCreationDate();
-        } else {
-            return null;
-        }
+        return switch (format()) {
+            case PDF -> new DocReaderPDF(file).getCreationDate();
+            case OFFICE -> new DocReaderMSO(file).getCreationDate();
+            case TEXT -> new DocReaderTXT(file).getCreationDate();
+            case UNSUPPORTED -> null;
+        };
     }
 
 }

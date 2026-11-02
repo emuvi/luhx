@@ -1,6 +1,8 @@
 package br.com.pointel.luhx;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.File;
@@ -8,6 +10,26 @@ import java.util.List;
 import org.junit.jupiter.api.Test;
 
 class DocReaderUtilsTest {
+
+    @Test
+    void shouldCreateTextPreviewsWithinRequestedLength() {
+        assertEquals("hello", DocReaderUtils.preview("hello", 10));
+        assertEquals("hel", DocReaderUtils.preview("hello", 3));
+        assertEquals("", DocReaderUtils.preview("hello", 0));
+    }
+
+    @Test
+    void shouldRejectNegativeTextPreviewLength() {
+        assertThrows(IndexOutOfBoundsException.class, () -> DocReaderUtils.preview("hello", -1));
+    }
+
+    @Test
+    void shouldCountWordsAndHandleEmptyText() {
+        assertEquals(3, DocReaderUtils.wordCount("one   two\nthree"));
+        assertEquals(0, DocReaderUtils.wordCount(""));
+        assertEquals(0, DocReaderUtils.wordCount(" \t\n "));
+        assertEquals(0, DocReaderUtils.wordCount(null));
+    }
 
     @Test
     void shouldIdentifyPlainTextExtensions() {
@@ -61,4 +83,3 @@ class DocReaderUtilsTest {
     }
 
 }
-

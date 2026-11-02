@@ -181,11 +181,7 @@ public class DocReaderPDF {
      * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
-        String full = read();
-        if (full.length() <= length) {
-            return full;
-        }
-        return full.substring(0, length);
+        return DocReaderUtils.preview(read(), length);
     }
 
     /**
@@ -195,9 +191,7 @@ public class DocReaderPDF {
      * @throws Exception if an error occurs
      */
     public int getWordCount() throws Exception {
-        String full = read();
-        if (full == null || full.trim().isEmpty()) return 0;
-        return full.trim().split("\\s+").length;
+        return DocReaderUtils.wordCount(read());
     }
 
     /**
