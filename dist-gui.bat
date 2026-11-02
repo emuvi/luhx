@@ -5,17 +5,19 @@ cd /d "%~dp0"
 rem Builds a self-contained graphical Luhx distribution.
 rem Requires JDK 21+ (java, jlink, jpackage) and Maven in the PATH.
 
-set "NAME=Luhx"
+set "NAME=Luhx-GUI"
 set "MAIN_CLASS=br.com.pointel.luhx.LuhxGUI"
 set "DIST=%~dp0dist"
 set "PACKAGE=%DIST%\gui"
 set "INPUT=%PACKAGE%\input"
 set "RUNTIME=%PACKAGE%\runtime"
 set "APP=%PACKAGE%\app"
+for %%J in (jlink.exe) do set "JDKBIN=%%~dp$PATH:J"
 
 for %%T in (java jlink jpackage mvn) do (
     where %%T >nul 2>&1 || (echo ERROR: %%T not found in PATH.& exit /b 1)
 )
+if not exist "%JDKBIN%jdeps.exe" (echo ERROR: jdeps.exe not found beside jlink.exe.& exit /b 1)
 
 echo [1/7] Cleaning previous graphical-interface intermediates...
 for %%D in ("%INPUT%" "%RUNTIME%" "%APP%" "%PACKAGE%\installer") do if exist %%D rmdir /s /q %%D
@@ -33,13 +35,14 @@ if errorlevel 1 (echo ERROR: could not create staging directory.& exit /b 1)
 copy /y "%DIST%\luhx.jar" "%INPUT%\" >nul || exit /b 1
 copy /y "%DIST%\lib\*.jar" "%INPUT%\lib\" >nul || exit /b 1
 
-echo [4/7] Listing JDK modules...
-for %%J in (jlink.exe) do set "JDKBIN=%%~dp$PATH:J"
-"%JDKBIN%java" --list-modules > "%PACKAGE%\modules.txt"
+echo [4/7] Analyzing required Java modules...
+"%JDKBIN%jdeps" --multi-release 21 --print-module-deps --ignore-missing-deps --recursive --class-path "%INPUT%\lib\*" "%INPUT%\luhx.jar" > "%PACKAGE%\modules.txt"
 if errorlevel 1 (echo ERROR: could not list modules.& exit /b 1)
+set /p "MODULES="<"%PACKAGE%\modules.txt"
+if not defined MODULES (echo ERROR: no required modules were detected.& exit /b 1)
 
 echo [5/7] Creating Java runtime with jlink...
-jlink --add-modules ALL-MODULE-PATH --output "%RUNTIME%" --strip-debug --no-header-files --no-man-pages --compress zip-6
+jlink --add-modules %MODULES% --output "%RUNTIME%" --strip-debug --no-header-files --no-man-pages --compress zip-6
 if errorlevel 1 (echo ERROR: jlink failed.& exit /b 1)
 
 echo [6/7] Creating graphical application image...

@@ -20,7 +20,8 @@ The executable JAR is created at `dist/luhx.jar`; its runtime dependencies are c
 Run `dist-cmd.bat` to build a self-contained command-line application, or
 `dist-gui.bat` to build the graphical interface. Both scripts require JDK 21 or
 later, Maven, and WiX Toolset 3.x on Windows. The command-line distribution
-includes a console; the GUI distribution does not.
+includes a console; the GUI distribution does not. Each script analyzes the app
+and its dependencies and includes only the Java runtime modules they require.
 
 The outputs are kept separate:
 
