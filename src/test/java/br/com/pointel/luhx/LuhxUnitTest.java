@@ -61,4 +61,16 @@ class LuhxUnitTest {
         assertTrue(results.isEmpty());
     }
 
+    @Test
+    void shouldRejectInvalidSearchPageArguments() {
+        assertThrows(IllegalArgumentException.class,
+                () -> Luhx.searchFolderPage(null, 0, 1, "term"));
+        assertThrows(IllegalArgumentException.class,
+                () -> Luhx.searchFolderPage(tempDir, -1, 1, "term"));
+        assertThrows(IllegalArgumentException.class,
+                () -> Luhx.searchFolderPage(tempDir, 0, 0, "term"));
+        assertThrows(IllegalArgumentException.class,
+                () -> Luhx.searchFolderPage(tempDir, 0, -1, "term"));
+    }
+
 }

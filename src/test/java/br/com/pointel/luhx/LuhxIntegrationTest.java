@@ -86,6 +86,93 @@ class LuhxIntegrationTest {
     }
 
     @Test
+    void shouldReportIndexLifecycleAndExcludeTheIndexDirectory() throws Exception {
+        Path document = tempDir.resolve("visible.txt");
+        Files.writeString(document, "A searchable lifecycle document.");
+        Path hiddenDocument = Files.createDirectories(tempDir.resolve(Luhx.INDEX_DIR_NAME))
+                .resolve("hidden.txt");
+        Files.writeString(hiddenDocument, "This hiddenindexword must not be indexed.");
+
+        List<Path> startedFolders = new CopyOnWriteArrayList<>();
+        List<String> indexedFiles = new CopyOnWriteArrayList<>();
+        List<Luhx.IndexAction> actions = new CopyOnWriteArrayList<>();
+        List<Luhx.IndexStats> finishedStats = new CopyOnWriteArrayList<>();
+        List<String> errors = new CopyOnWriteArrayList<>();
+        Luhx.IndexObserver observer = new Luhx.IndexObserver() {
+            @Override
+            public void onStart(Path folder) {
+                startedFolders.add(folder);
+            }
+
+            @Override
+            public void onFile(String relativePath, Luhx.IndexAction action) {
+                indexedFiles.add(relativePath);
+                actions.add(action);
+            }
+
+            @Override
+            public void onError(String relativePath, Exception error) {
+                errors.add(relativePath);
+            }
+
+            @Override
+            public void onFinish(Luhx.IndexStats stats) {
+                finishedStats.add(stats);
+            }
+        };
+
+        Luhx.IndexStats stats = Luhx.indexFolder(tempDir, observer);
+
+        assertEquals(new Luhx.IndexStats(1, 0, 0, 0), stats);
+        assertEquals(List.of(tempDir.toAbsolutePath().normalize()), startedFolders);
+        assertEquals(List.of("visible.txt"), indexedFiles);
+        assertEquals(List.of(Luhx.IndexAction.CREATED), actions);
+        assertEquals(List.of(stats), finishedStats);
+        assertTrue(errors.isEmpty());
+        assertEquals(1, Luhx.searchFolder(tempDir, "lifecycle").size());
+        assertTrue(Luhx.searchFolder(tempDir, "hiddenindexword").isEmpty());
+    }
+
+    @Test
+    void shouldPreserveTheExistingIndexWhenIndexingIsCancelled() throws Exception {
+        Path originalDocument = tempDir.resolve("original.txt");
+        Files.writeString(originalDocument, "previouslyindexedword remains in the index.");
+        Luhx.indexFolder(tempDir);
+
+        Files.delete(originalDocument);
+        Files.writeString(tempDir.resolve("new.txt"), "newlycreatedword must wait for indexing.");
+
+        List<Luhx.IndexStats> cancelledStats = new CopyOnWriteArrayList<>();
+        List<Luhx.IndexStats> finishedStats = new CopyOnWriteArrayList<>();
+        Luhx.IndexObserver observer = new Luhx.IndexObserver() {
+            @Override
+            public boolean isCancelled() {
+                return true;
+            }
+
+            @Override
+            public void onCancel(Luhx.IndexStats stats) {
+                cancelledStats.add(stats);
+            }
+
+            @Override
+            public void onFinish(Luhx.IndexStats stats) {
+                finishedStats.add(stats);
+            }
+        };
+
+        Luhx.IndexStats stats = Luhx.indexFolder(tempDir, observer);
+
+        assertEquals(new Luhx.IndexStats(0, 0, 0, 0), stats);
+        assertEquals(List.of(stats), cancelledStats);
+        assertTrue(finishedStats.isEmpty());
+        List<Luhx.SearchResult> priorResults = Luhx.searchFolder(tempDir, "previouslyindexedword");
+        assertEquals(1, priorResults.size());
+        assertFalse(Files.exists(priorResults.get(0).file()));
+        assertTrue(Luhx.searchFolder(tempDir, "newlycreatedword").isEmpty());
+    }
+
+    @Test
     void shouldUpdateIndexWhenFilesAreCreatedModifiedOrDeleted() throws Exception {
         Path doc1 = tempDir.resolve("doc1.txt");
         Path doc2 = tempDir.resolve("doc2.txt");
