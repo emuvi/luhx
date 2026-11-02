@@ -78,10 +78,10 @@ public class Luhx {
         /** Called after each file is processed (or removed from the index). */
         default void onFile(String relativePath, IndexAction action) {}
 
-        /** Called when a file fails to index; the run is then aborted. */
+        /** Called when a file fails to index; the run continues with other files. */
         default void onError(String relativePath, Exception error) {}
 
-        /** Called once after a successful run. */
+        /** Called once after the run completes, including runs with per-file failures. */
         default void onFinish(IndexStats stats) {}
 
         /** Polled between files; return true to stop the run early. */
@@ -141,8 +141,7 @@ public class Luhx {
      * @return counts of created, modified, deleted, and unchanged files
      * @throws IllegalArgumentException if {@code folderPath} is null, does not exist,
      *                                  or is not a directory
-     * @throws Exception if the index cannot be created or updated, or a supported
-     *                   file cannot be read
+     * @throws Exception if the index cannot be created or updated
      */
     public static IndexStats indexFolder(Path folderPath) throws Exception {
         return indexFolder(folderPath, null);
@@ -221,15 +220,11 @@ public class Luhx {
                             Math.max(1, found.size())));
                     ExecutorService pool = Executors.newFixedThreadPool(threads);
                     Object lock = new Object();
-                    Exception[] failure = new Exception[1];
                     try {
                         List<Future<?>> futures = new ArrayList<>();
                         for (Found item : found) {
                             futures.add(pool.submit(() -> {
                                 synchronized (lock) {
-                                    if (failure[0] != null) {
-                                        return;
-                                    }
                                     if (cancelled[0] || obs.isCancelled()) {
                                         cancelled[0] = true;
                                         return;
@@ -245,9 +240,6 @@ public class Luhx {
                                             && (existing.lastModified() != lastModified || existing.fileSize() != fileSize);
                                     String content = (existing == null || changed) ? extractText(file) : null;
                                     synchronized (lock) {
-                                        if (failure[0] != null) {
-                                            return;
-                                        }
                                         if (existing == null) {
                                             insertStmt.setString(1, relPath);
                                             insertStmt.setString(2, file.getName());
@@ -273,11 +265,10 @@ public class Luhx {
                                     }
                                 } catch (Exception e) {
                                     synchronized (lock) {
-                                        if (failure[0] == null) {
-                                            failure[0] = new IOException("Failed to index " + relPath, e);
-                                            obs.onFile(relPath, IndexAction.FAILED);
-                                            obs.onError(relPath, e);
-                                        }
+                                        System.err.println("Failed to index " + relPath + ": " + e);
+                                        e.printStackTrace(System.err);
+                                        obs.onFile(relPath, IndexAction.FAILED);
+                                        obs.onError(relPath, e);
                                     }
                                 }
                             }));
@@ -287,9 +278,6 @@ public class Luhx {
                         }
                     } finally {
                         pool.shutdownNow();
-                    }
-                    if (failure[0] != null) {
-                        throw (IOException) failure[0];
                     }
                 }
 

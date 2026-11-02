@@ -120,7 +120,7 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
     public void onError(String relativePath, Exception error) {
         SwingUtilities.invokeLater(() -> {
             Throwable cause = error.getCause() != null ? error.getCause() : error;
-            finished("Error on " + relativePath + ": " + cause);
+            append("Error on " + relativePath + ": " + cause);
         });
     }
 

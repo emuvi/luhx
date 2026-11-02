@@ -13,6 +13,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.FileTime;
 import java.util.List;
+import java.util.concurrent.CopyOnWriteArrayList;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
@@ -141,6 +142,32 @@ class LuhxIntegrationTest {
         // Verify that the deleted file no longer appears in search results
         assertTrue(Luhx.searchFolder(tempDir, "ephemeral").isEmpty(),
                 "The deleted file should no longer appear in search results");
+    }
+
+    @Test
+    void shouldContinueIndexingAndReportErrorsWhenAFileCannotBeRead() throws Exception {
+        Files.writeString(tempDir.resolve("broken.pdf"), "not a PDF");
+        Files.writeString(tempDir.resolve("valid.txt"), "A valid document with a searchable keyword.");
+        ByteArrayOutputStream errorBuffer = new ByteArrayOutputStream();
+        PrintStream originalErr = System.err;
+        List<String> failedFiles = new CopyOnWriteArrayList<>();
+        try {
+            System.setErr(new PrintStream(errorBuffer, true, StandardCharsets.UTF_8));
+
+            Luhx.IndexStats stats = Luhx.indexFolder(tempDir, new Luhx.IndexObserver() {
+                @Override
+                public void onError(String relativePath, Exception error) {
+                    failedFiles.add(relativePath);
+                }
+            });
+
+            assertEquals(1, stats.created());
+            assertEquals(1, Luhx.searchFolder(tempDir, "searchable").size());
+            assertTrue(failedFiles.contains("broken.pdf"));
+            assertTrue(errorBuffer.toString(StandardCharsets.UTF_8).contains("Failed to index broken.pdf"));
+        } finally {
+            System.setErr(originalErr);
+        }
     }
 
     @Test

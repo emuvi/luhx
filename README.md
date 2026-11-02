@@ -61,7 +61,11 @@ java -jar dist/luhx.jar --version
 java -jar dist/luhx.jar --index <folder>
 ```
 
-Indexing scans the folder recursively. On subsequent runs, Luhx adds new files, reindexes files whose size or modification time changed, removes entries for deleted files, and leaves unchanged files alone. The command reports counts for each category.
+Indexing scans the folder recursively. On subsequent runs, Luhx adds new files,
+reindexes files whose size or modification time changed, removes entries for
+deleted files, and leaves unchanged files alone. If an individual file cannot
+be indexed, its error is printed and indexing continues with the remaining files.
+The command reports counts for each successfully processed category.
 
 ### Search an index
 
