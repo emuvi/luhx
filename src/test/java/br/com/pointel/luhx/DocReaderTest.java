@@ -118,9 +118,14 @@ class DocReaderTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              FileOutputStream out = new FileOutputStream(xlsxFile)) {
             var sheet = workbook.createSheet("Finance");
+            workbook.getProperties().getCoreProperties().setCreator("Test Author");
+            workbook.getProperties().getCoreProperties().setTitle("Finance workbook");
             var row = sheet.createRow(0);
             row.createCell(0).setCellValue("Revenue");
             row.createCell(1).setCellValue("Quarterly");
+            for (int i = 1; i < 200; i++) {
+                sheet.createRow(i).createCell(0).setCellValue("Row " + i);
+            }
             workbook.write(out);
         }
 
@@ -130,7 +135,10 @@ class DocReaderTest {
         assertTrue(text.contains("Finance"));
         assertTrue(text.contains("Revenue"));
         assertTrue(text.contains("Quarterly"));
+        assertTrue(text.contains("Row 199"));
         assertEquals(1, reader.countPages());
+        assertEquals("Test Author", reader.getAuthor());
+        assertEquals("Finance workbook", reader.getTitle());
     }
 
     @Test

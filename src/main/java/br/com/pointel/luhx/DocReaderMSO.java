@@ -3,24 +3,35 @@ package br.com.pointel.luhx;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.attribute.BasicFileAttributes;
 import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import org.apache.poi.hssf.extractor.ExcelExtractor;
 import org.apache.poi.hssf.usermodel.HSSFWorkbook;
 import org.apache.poi.hwpf.HWPFDocument;
 import org.apache.poi.hwpf.extractor.WordExtractor;
+import org.apache.poi.openxml4j.opc.OPCPackage;
+import org.apache.poi.openxml4j.opc.PackageAccess;
+import org.apache.poi.openxml4j.opc.PackageProperties;
+import org.apache.poi.poifs.filesystem.FileMagic;
 import org.apache.poi.sl.extractor.SlideShowExtractor;
 import org.apache.poi.sl.usermodel.SlideShowFactory;
+import org.apache.poi.ss.usermodel.DataFormatter;
 import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
+import org.apache.poi.util.XMLHelper;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
-import org.apache.poi.xssf.extractor.XSSFExcelExtractor;
-import org.apache.poi.xssf.usermodel.XSSFWorkbook;
+import org.apache.poi.xssf.eventusermodel.XSSFReader;
+import org.apache.poi.xssf.eventusermodel.XSSFSheetXMLHandler;
+import org.apache.poi.xssf.model.SharedStrings;
+import org.apache.poi.xssf.model.StylesTable;
 import org.apache.poi.xwpf.extractor.XWPFWordExtractor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.xml.sax.InputSource;
 
 /**
  * A specialized document reader that extracts text from Microsoft Office documents.
@@ -124,6 +135,9 @@ public class DocReaderMSO {
      * @throws Exception if an error occurs reading the file or format is unsupported
      */
     private String extractTextFromExcel() throws Exception {
+        if (isXlsxFile()) {
+            return extractTextFromExcelXml();
+        }
         try (Workbook workbook = WorkbookFactory.create(path)) {
             if (workbook instanceof HSSFWorkbook legacyWorkbook) {
                 try (var extractor = new ExcelExtractor(legacyWorkbook)) {
@@ -132,15 +146,63 @@ public class DocReaderMSO {
                     return extractor.getText();
                 }
             }
-            if (workbook instanceof XSSFWorkbook xmlWorkbook) {
-                try (var extractor = new XSSFExcelExtractor(xmlWorkbook)) {
-                    extractor.setFormulasNotResults(false);
-                    extractor.setIncludeSheetNames(true);
-                    return extractor.getText();
-                }
-            }
             throw new IOException("Unsupported Excel workbook type: " + path.getName());
         }
+    }
+
+    private String extractTextFromExcelXml() throws Exception {
+        try (OPCPackage pkg = OPCPackage.open(path, PackageAccess.READ)) {
+            XSSFReader reader = new XSSFReader(pkg);
+            reader.setUseReadOnlySharedStringsTable(true);
+            SharedStrings sharedStrings = reader.getSharedStringsTable();
+            StylesTable styles = reader.getStylesTable();
+            DataFormatter formatter = new DataFormatter();
+            XSSFReader.SheetIterator sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
+            StringBuilder text = new StringBuilder();
+
+            while (sheets.hasNext()) {
+                try (InputStream sheet = sheets.next()) {
+                    if (text.length() > 0) {
+                        text.append(System.lineSeparator());
+                    }
+                    text.append(sheets.getSheetName()).append(System.lineSeparator());
+
+                    var contents = new XSSFSheetXMLHandler.SheetContentsHandler() {
+                        @Override
+                        public void startRow(int rowNum) {}
+
+                        @Override
+                        public void endRow(int rowNum) {
+                            text.append(System.lineSeparator());
+                        }
+
+                        @Override
+                        public void cell(String cellReference, String formattedValue,
+                                org.apache.poi.xssf.usermodel.XSSFComment comment) {
+                            if (formattedValue != null) {
+                                text.append(formattedValue).append('\t');
+                            }
+                        }
+
+                        @Override
+                        public void headerFooter(String value, boolean isHeader, String tagName) {
+                            if (value != null && !value.isBlank()) {
+                                text.append(value).append(System.lineSeparator());
+                            }
+                        }
+                    };
+                    var parser = XMLHelper.newXMLReader();
+                    parser.setContentHandler(new XSSFSheetXMLHandler(
+                            styles, sharedStrings, contents, formatter, false));
+                    parser.parse(new InputSource(sheet));
+                }
+            }
+            return text.toString();
+        }
+    }
+
+    private boolean isXlsxFile() throws IOException {
+        return FileMagic.valueOf(path) == FileMagic.OOXML;
     }
 
     /**
@@ -246,6 +308,19 @@ public class DocReaderMSO {
                 }
             }
         } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
+            if (isXlsxFile()) {
+                try (OPCPackage pkg = OPCPackage.open(path, PackageAccess.READ)) {
+                    XSSFReader reader = new XSSFReader(pkg);
+                    Iterator<InputStream> sheets = reader.getSheetsData();
+                    int count = 0;
+                    while (sheets.hasNext()) {
+                        try (InputStream ignored = sheets.next()) {
+                            count++;
+                        }
+                    }
+                    return count;
+                }
+            }
             try (Workbook workbook = WorkbookFactory.create(path)) {
                 return workbook.getNumberOfSheets();
             }
@@ -360,6 +435,14 @@ public class DocReaderMSO {
                 }
             }
         } else if (DocReaderMSOUtils.isMSExcelFile(path)) {
+            if (isXlsxFile()) {
+                try (OPCPackage pkg = OPCPackage.open(path, PackageAccess.READ)) {
+                    PackageProperties properties = pkg.getPackageProperties();
+                    if ("author".equals(property)) return properties.getCreatorProperty().orElse(null);
+                    if ("title".equals(property)) return properties.getTitleProperty().orElse(null);
+                    if ("creationDate".equals(property)) return properties.getCreatedProperty().orElse(null);
+                }
+            }
             try (Workbook workbook = WorkbookFactory.create(path)) {
                 if (workbook instanceof HSSFWorkbook doc) {
                     var info = doc.getSummaryInformation();
@@ -367,12 +450,6 @@ public class DocReaderMSO {
                     if ("author".equals(property)) return info.getAuthor();
                     if ("title".equals(property)) return info.getTitle();
                     if ("creationDate".equals(property)) return info.getCreateDateTime();
-                } else if (workbook instanceof XSSFWorkbook doc) {
-                    var props = doc.getProperties().getCoreProperties();
-                    if (props == null) return null;
-                    if ("author".equals(property)) return props.getCreator();
-                    if ("title".equals(property)) return props.getTitle();
-                    if ("creationDate".equals(property)) return props.getCreated();
                 }
             }
         } else if (DocReaderMSOUtils.isMSPowerPointFile(path)) {

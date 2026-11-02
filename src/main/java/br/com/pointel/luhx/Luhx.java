@@ -219,10 +219,13 @@ public class Luhx {
                 });
 
                 if (!cancelled[0]) {
-                    // Capped because each worker holds a whole document's text in memory.
-                    int threads = Math.max(1, Math.min(Math.min(Runtime.getRuntime().availableProcessors(), 4),
+                    // Every processor parses in parallel; the gate admits a file only while the
+                    // estimated heap of the files being parsed fits, so huge files run alone
+                    // instead of exhausting the heap together.
+                    int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(),
                             Math.max(1, found.size())));
                     ExecutorService pool = Executors.newFixedThreadPool(threads);
+                    MemoryGate gate = new MemoryGate((long) (Runtime.getRuntime().maxMemory() * 0.5));
                     Object lock = new Object();
                     try {
                         List<Future<?>> futures = new ArrayList<>();
@@ -239,10 +242,15 @@ public class Luhx {
                                 long lastModified = file.lastModified();
                                 long fileSize = file.length();
                                 DocMeta existing = existingDocs.get(relPath);
+                                long weight = 0;
                                 try {
                                     boolean changed = existing != null
                                             && (existing.lastModified() != lastModified || existing.fileSize() != fileSize);
-                                    String content = (existing == null || changed) ? extractText(file) : null;
+                                    String content = null;
+                                    if (existing == null || changed) {
+                                        weight = gate.acquire(estimateHeapCost(file, fileSize));
+                                        content = extractText(file);
+                                    }
                                     synchronized (lock) {
                                         if (existing == null) {
                                             insertStmt.setString(1, relPath);
@@ -273,6 +281,8 @@ public class Luhx {
                                         synchronized (lock) {
                                             reportIndexFailure(relPath, e, obs);
                                         }
+                                    } finally {
+                                        gate.release(weight);
                                     }
                             }));
                         }
@@ -320,6 +330,41 @@ public class Luhx {
     }
 
     private static final int FLUSH_EVERY = 100;
+
+    /** Estimates the heap needed to parse a file, since parsers expand compressed formats. */
+    private static long estimateHeapCost(File file, long fileSize) {
+        String name = file.getName().toLowerCase();
+        boolean ooxml = name.endsWith(".docx") || name.endsWith(".xlsx") || name.endsWith(".pptx");
+        long factor = ooxml ? 30 : name.endsWith(".pdf") ? 8 : 6;
+        return Math.max(1L << 20, fileSize * factor);
+    }
+
+    /** Bounds the combined estimated heap of the files being parsed at the same time. */
+    private static final class MemoryGate {
+        private final long budget;
+        private long used;
+
+        MemoryGate(long budget) {
+            this.budget = Math.max(1L << 20, budget);
+        }
+
+        /** Blocks until the cost fits (a cost above the budget waits for an idle gate) and returns the cost reserved. */
+        synchronized long acquire(long cost) throws InterruptedException {
+            long reserved = Math.min(cost, budget);
+            while (used > 0 && used + reserved > budget) {
+                wait();
+            }
+            used += reserved;
+            return reserved;
+        }
+
+        synchronized void release(long reserved) {
+            if (reserved > 0) {
+                used -= reserved;
+                notifyAll();
+            }
+        }
+    }
 
     // Commits and checkpoints periodically so pending changes and the full-text index reach disk
     // instead of accumulating in memory. Callers must hold the index lock.

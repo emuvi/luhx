@@ -28,7 +28,7 @@ java -Xmx%HEAP% ^
   -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath="%OUT%\oom.hprof" ^
   "-Xlog:gc*:file=profile\gc.log:time,uptime" ^
   "-XX:StartFlightRecording=filename=%OUT%\run.jfr,settings=profile,dumponexit=true" ^
-  -cp "target\classes;%CP%" br.com.pointel.luhx.Luhx %1 %2 %3 %4 %5 %6 %7 %8 %9
+  -cp "target\classes;%CP%" br.com.pointel.luhx.Luhx %1 %2 %3 %4 %5 %6 %7 %8 %9 > "%OUT%\run.log" 2>&1
 set "RC=%ERRORLEVEL%"
 
 if not exist "%OUT%\run.jfr" (
@@ -54,6 +54,7 @@ findstr /i "longestPause sumOfPauses" "%OUT%\gcevents.txt" | sort /r | more +0
 echo.
 echo Files in %OUT%:
 echo   run.jfr     - open in JDK Mission Control or IntelliJ/VS Code JFR viewer
+echo   run.log     - application stdout and stderr
 echo   gc.log      - GC activity over time
 echo   oom.hprof   - heap dump if OutOfMemoryError happened (open in Eclipse MAT / VisualVM)
 echo   samples.txt, alloc.txt - raw event dumps
