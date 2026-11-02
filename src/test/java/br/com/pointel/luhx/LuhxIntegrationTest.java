@@ -107,6 +107,17 @@ class LuhxIntegrationTest {
     }
 
     @Test
+    void shouldReturnMoreThanOneHundredResultsAcrossPages() throws Exception {
+        for (int i = 0; i < 130; i++) {
+            Files.writeString(tempDir.resolve("doc" + i + ".txt"), "manyhits");
+        }
+        Luhx.indexFolder(tempDir);
+
+        assertEquals(130, Luhx.searchFolder(tempDir, "manyhits").size());
+        assertEquals(30, Luhx.searchFolderPage(tempDir, 100, 50, "manyhits").size());
+    }
+
+    @Test
     void shouldReportIndexLifecycleAndExcludeTheIndexDirectory() throws Exception {
         Path document = tempDir.resolve("visible.txt");
         Files.writeString(document, "A searchable lifecycle document.");

@@ -477,7 +477,7 @@ public class Luhx {
         try (Connection conn = DriverManager.getConnection(getJdbcUrl(normalizedFolder))) {
             String sql = """
                 SELECT D.FILE_PATH, FT.SCORE
-                FROM FTL_SEARCH_DATA(?, 0, 0) FT
+                FROM FTL_SEARCH_DATA(?, ?, 0) FT
                 JOIN DOCUMENTS D ON FT."TABLE" = 'DOCUMENTS' AND D.ID = CAST(FT."KEYS"[1] AS BIGINT)
                 ORDER BY FT.SCORE DESC, D.FILE_PATH ASC
                 LIMIT ? OFFSET ?
@@ -485,8 +485,10 @@ public class Luhx {
 
             try (PreparedStatement stmt = conn.prepareStatement(sql)) {
                 stmt.setString(1, query);
-                stmt.setInt(2, limit);
-                stmt.setInt(3, offset);
+                // A zero limit makes H2 cap the Lucene hits at 100, so request every hit up to this page.
+                stmt.setInt(2, (int) Math.min((long) offset + limit, Integer.MAX_VALUE));
+                stmt.setInt(3, limit);
+                stmt.setInt(4, offset);
                 try (ResultSet rs = stmt.executeQuery()) {
                     List<SearchResult> results = new ArrayList<>();
                     while (rs.next()) {

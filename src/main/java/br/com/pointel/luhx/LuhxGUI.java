@@ -219,7 +219,7 @@ public class LuhxGUI extends JFrame {
         DefaultListModel<String> resultModel = new DefaultListModel<>();
         int firstPageSize = Math.min(firstPage.size(), SEARCH_PAGE_SIZE);
         for (int i = 0; i < firstPageSize; i++) {
-            addResult(firstPage.get(i), loaded, resultModel);
+            addResult(firstPage.get(i), folder, loaded, resultModel);
         }
         JList<String> view = new JList<>(resultModel);
         view.addMouseListener(new MouseAdapter() {
@@ -250,7 +250,7 @@ public class LuhxGUI extends JFrame {
                 WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING, WindowConfig.PADDING));
         content.setPreferredSize(new Dimension(700, 340));
 
-        JFrame resultsWindow = new JFrame("Results for: " + query);
+        JFrame resultsWindow = new JFrame("Search: " + query);
         resultsWindow.setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         resultsWindow.setContentPane(content);
         resultsWindow.pack();
@@ -259,9 +259,21 @@ public class LuhxGUI extends JFrame {
     }
 
     private static void addResult(
-            Luhx.SearchResult result, List<Luhx.SearchResult> loaded, DefaultListModel<String> model) {
+            Luhx.SearchResult result, Path searchRoot,
+            List<Luhx.SearchResult> loaded, DefaultListModel<String> model) {
         loaded.add(result);
-        model.addElement(String.format("[%.4f] %s", result.score(), result.file()));
+        Path file = result.file();
+        StringBuilder label = new StringBuilder(String.format("[%.4f]: %s ",
+                result.score(), file.getFileName()));
+        Path root = searchRoot.toAbsolutePath().normalize();
+        for (Path parent = file.getParent();
+                parent != null && parent.startsWith(root);
+                parent = parent.getParent()) {
+            if (parent.getFileName() != null) {
+                label.append(" | ").append(parent.getFileName());
+            }
+        }
+        model.addElement(label.toString());
     }
 
     private static void updateSearchStatus(JLabel status, JButton loadMore, int loaded, boolean hasMore) {
@@ -292,7 +304,7 @@ public class LuhxGUI extends JFrame {
                     List<Luhx.SearchResult> page = get();
                     int pageSize = Math.min(page.size(), SEARCH_PAGE_SIZE);
                     for (int i = 0; i < pageSize; i++) {
-                        addResult(page.get(i), loaded, model);
+                        addResult(page.get(i), folder, loaded, model);
                     }
                     updateSearchStatus(status, loadMore, loaded.size(), page.size() > SEARCH_PAGE_SIZE);
                 } catch (Exception ex) {
