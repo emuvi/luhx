@@ -107,6 +107,44 @@ class LuhxIntegrationTest {
     }
 
     @Test
+    void shouldApplySearchAliasesAndUsePathsToBreakScoreTies() throws Exception {
+        Files.writeString(tempDir.resolve("a.txt"), "sharedtiebreak alpha rock & roll");
+        Files.writeString(tempDir.resolve("b.txt"), "sharedtiebreak alpha rock & roll");
+        Files.writeString(tempDir.resolve("c.txt"), "beta only");
+        Files.writeString(tempDir.resolve("d.txt"), "rock plus roll");
+        Luhx.indexFolder(tempDir);
+
+        List<Luhx.SearchResult> tiedResults = Luhx.searchFolder(tempDir, "sharedtiebreak");
+        assertEquals(List.of("a.txt", "b.txt"),
+                tiedResults.stream().map(Luhx.SearchResult::relativePath).toList());
+
+        List<Luhx.SearchResult> aliasResults = Luhx.searchFolder(tempDir, "alpha || beta");
+        assertEquals(3, aliasResults.size());
+
+        List<Luhx.SearchResult> phraseResults = Luhx.searchFolder(tempDir, "\"rock & roll\"");
+        assertEquals(List.of("a.txt", "b.txt"),
+                phraseResults.stream().map(Luhx.SearchResult::relativePath).toList());
+    }
+
+    @Test
+    void shouldReindexSameSizeFilesWhenTheirModificationTimeChanges() throws Exception {
+        Path document = tempDir.resolve("changing.txt");
+        Files.writeString(document, "oldtoken stable");
+        Luhx.indexFolder(tempDir);
+
+        long changedTime = Files.getLastModifiedTime(document).toMillis() + 60_000;
+        Files.writeString(document, "newtoken stable");
+        Files.setLastModifiedTime(document, FileTime.fromMillis(changedTime));
+
+        Luhx.IndexStats stats = Luhx.indexFolder(tempDir);
+
+        assertEquals(new Luhx.IndexStats(0, 1, 0, 0), stats);
+        assertTrue(Luhx.searchFolder(tempDir, "oldtoken").isEmpty());
+        assertEquals(List.of("changing.txt"), Luhx.searchFolder(tempDir, "newtoken").stream()
+                .map(Luhx.SearchResult::relativePath).toList());
+    }
+
+    @Test
     void shouldReturnMoreThanOneHundredResultsAcrossPages() throws Exception {
         for (int i = 0; i < 130; i++) {
             Files.writeString(tempDir.resolve("doc" + i + ".txt"), "manyhits");

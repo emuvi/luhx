@@ -30,6 +30,22 @@ class LuhxUnitTest {
     }
 
     @Test
+    void shouldNormalizeShorthandOperatorsOutsideQuotedText() {
+        assertEquals("lucene AND h2", Luhx.buildLuceneQuery("lucene & h2"));
+        assertEquals("lucene OR h2", Luhx.buildLuceneQuery("lucene || h2"));
+        assertEquals("lucene NOT h2", Luhx.buildLuceneQuery("lucene !h2"));
+        assertEquals("\"rock & roll\" AND music", Luhx.buildLuceneQuery("\"rock & roll\"", "music"));
+        assertEquals("literal \\& symbol", Luhx.buildLuceneQuery("literal \\& symbol"));
+    }
+
+    @Test
+    void shouldCombineOnlyNonBlankTermsWhenBuildingLuceneQuery() {
+        assertEquals("lucene AND h2", Luhx.buildLuceneQuery("lucene", null, " ", "h2"));
+        assertEquals("java OR h2", Luhx.buildLuceneQuery("java", "OR", null, "h2"));
+        assertEquals("lucene AND database", Luhx.buildLuceneQuery("lucene AND database"));
+    }
+
+    @Test
     void shouldReturnEmptyQueryForNullOrBlankKeys() {
         assertEquals("", Luhx.buildLuceneQuery());
         assertEquals("", Luhx.buildLuceneQuery((String[]) null));

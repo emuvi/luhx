@@ -4,11 +4,13 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.awt.Rectangle;
 import java.io.File;
 import java.io.FileOutputStream;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
@@ -16,6 +18,7 @@ import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDDocumentInformation;
 import org.apache.pdfbox.pdmodel.PDPage;
 import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.interactive.annotation.PDAnnotationText;
 import org.apache.pdfbox.pdmodel.font.PDType1Font;
 import org.apache.poi.xslf.usermodel.XMLSlideShow;
 import org.apache.poi.xslf.usermodel.XSLFSlide;
@@ -65,6 +68,21 @@ class DocReaderTest {
     }
 
     @Test
+    void shouldReadAndWritePlainTextWithAnExplicitCharset() throws Exception {
+        Path textPath = tempDir.resolve("charset.txt");
+        DocReaderTXT reader = new DocReaderTXT(textPath.toFile());
+        reader.write("café");
+
+        assertEquals("café", reader.read(StandardCharsets.UTF_8));
+        assertEquals(List.of("café"), reader.readLines(StandardCharsets.UTF_8));
+
+        reader.append(" au lait");
+        assertEquals("café au lait", reader.read());
+        assertEquals("café", reader.readPreview(4));
+        assertThrows(IndexOutOfBoundsException.class, () -> reader.readPreview(-1));
+    }
+
+    @Test
     void shouldReadPdfFileThroughDocReader() throws Exception {
         File pdfFile = tempDir.resolve("document.pdf").toFile();
         try (PDDocument doc = new PDDocument()) {
@@ -96,6 +114,25 @@ class DocReaderTest {
     }
 
     @Test
+    void shouldIncludePdfAnnotationsAndRejectOutOfRangePages() throws Exception {
+        Path pdfPath = tempDir.resolve("annotated.pdf");
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage();
+            document.addPage(page);
+            PDAnnotationText annotation = new PDAnnotationText();
+            annotation.setContents("review comment");
+            page.getAnnotations().add(annotation);
+            document.save(pdfPath.toFile());
+        }
+
+        DocReaderPDF reader = new DocReaderPDF(pdfPath.toFile());
+        assertTrue(reader.readPage(0).contains("review comment"));
+        assertTrue(reader.read().contains("review comment"));
+        assertThrows(IllegalArgumentException.class, () -> reader.readPage(-1));
+        assertThrows(IllegalArgumentException.class, () -> reader.getPageAsImage(1, 72));
+    }
+
+    @Test
     void shouldReadWordDocxFileThroughDocReader() throws Exception {
         File docxFile = tempDir.resolve("document.docx").toFile();
         try (XWPFDocument doc = new XWPFDocument();
@@ -118,6 +155,7 @@ class DocReaderTest {
         try (XSSFWorkbook workbook = new XSSFWorkbook();
              FileOutputStream out = new FileOutputStream(xlsxFile)) {
             var sheet = workbook.createSheet("Finance");
+            workbook.createSheet("Summary");
             workbook.getProperties().getCoreProperties().setCreator("Test Author");
             workbook.getProperties().getCoreProperties().setTitle("Finance workbook");
             var row = sheet.createRow(0);
@@ -136,7 +174,7 @@ class DocReaderTest {
         assertTrue(text.contains("Revenue"));
         assertTrue(text.contains("Quarterly"));
         assertTrue(text.contains("Row 199"));
-        assertEquals(1, reader.countPages());
+        assertEquals(2, reader.countPages());
         assertEquals("Test Author", reader.getAuthor());
         assertEquals("Finance workbook", reader.getTitle());
     }
@@ -167,6 +205,7 @@ class DocReaderTest {
             XSLFTextBox box = slide.createTextBox();
             box.setAnchor(new Rectangle(50, 50, 400, 100));
             box.setText("Presentation about search engine architecture");
+            ppt.createSlide();
             ppt.write(out);
         }
 
@@ -174,7 +213,7 @@ class DocReaderTest {
         DocReader reader = new DocReader(pptxFile);
         String text = reader.read();
         assertTrue(text.contains("Presentation about search engine architecture"));
-        assertEquals(1, reader.countPages());
+        assertEquals(2, reader.countPages());
     }
 
     @Test
