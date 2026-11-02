@@ -1,6 +1,11 @@
 package br.com.pointel.luhx;
 
-/** Shared text operations used by the document readers. */
+/**
+ * Package-private text operations shared by the document readers.
+ *
+ * <p>This class centralizes preview slicing and whitespace-token counting so
+ * the supported document formats use the same definitions.
+ */
 final class DocReaderUtils {
 
     private DocReaderUtils() {}

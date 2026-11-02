@@ -35,17 +35,20 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.xml.sax.InputSource;
 
 /**
- * A specialized document reader that extracts text from Microsoft Office documents.
- * It leverages Apache POI to parse both legacy OLE2 formats (.doc, .xls, .ppt) 
- * and modern OOXML formats (.docx, .xlsx, .pptx).
+ * Extracts text, basic metadata, and format-specific counts from Microsoft
+ * Word, Excel, and PowerPoint documents using Apache POI.
+ *
+ * <p>Recognized extensions are {@code doc}, {@code docx}, {@code xls},
+ * {@code xlsx}, {@code ppt}, and {@code pptx}. Detection is extension-based;
+ * the file contents are parsed only when a read operation is requested.
  */
 public class DocReaderMSO {
 
     /**
-     * Checks if the file is a supported Microsoft Office format.
+     * Checks whether the file name has a supported Microsoft Office extension.
      *
      * @param file the file to check
-     * @return true if the file is an Office document
+     * @return {@code true} if the extension is supported; {@code false} otherwise
      */
     public static boolean canRead(File file) {
         return DocReaderMSOUtils.isMSWordFile(file)
@@ -57,19 +60,21 @@ public class DocReaderMSO {
     private final File path;
 
     /**
-     * Constructs a reader for an Office document.
+     * Creates a reader for a Microsoft Office document.
      *
-     * @param path the file to read
+     * @param path file to read; must not be {@code null}
      */
     public DocReaderMSO(File path) {
         this.path = path;
     }
 
     /**
-     * Automatically identifies the specific Office format and delegates to the appropriate extractor.
+     * Extracts text using the parser selected by the file extension. PowerPoint
+     * extraction includes slide content, notes, and comments; spreadsheet
+     * extraction includes sheet names and cell values.
      *
-     * @return the extracted raw text
-     * @throws Exception if the file cannot be read or the format is unknown
+     * @return extracted text in document order
+     * @throws Exception if the file cannot be read or parsed
      */
     public String read() throws Exception {
         if (DocReaderMSOUtils.isMSWordFile(path)) {
@@ -264,21 +269,22 @@ public class DocReaderMSO {
     }
 
     /**
-     * Reads all lines from the document text.
+     * Extracts document text and splits it at line-feed boundaries.
      *
-     * @return a list containing all lines
-     * @throws Exception if an error occurs
+     * @return extracted lines in document order
+     * @throws Exception if the document cannot be read or parsed
      */
     public List<String> readLines() throws Exception {
         return Arrays.asList(read().split("\\r?\\n"));
     }
 
     /**
-     * Reads a preview of the document contents up to the given length.
+     * Returns at most the requested number of leading characters from the
+     * extracted document text.
      *
      * @param length the maximum number of characters to return; must not be negative
      * @return up to {@code length} characters
-     * @throws Exception if an error occurs
+     * @throws Exception if the document cannot be read or parsed
      * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
@@ -286,11 +292,13 @@ public class DocReaderMSO {
     }
 
     /**
-     * Obtains the count reported for the document format: pages for Word, sheets
-     * for Excel, or slides for PowerPoint.
+     * Returns the count reported for the document format: page metadata for
+     * Word, worksheet count for Excel, or slide count for PowerPoint. Word
+     * formats that do not provide page metadata report one.
      *
-     * @return the reported count, or 1 if the format is unsupported or Word page metadata is unavailable
-     * @throws Exception if an error occurs reading the document metadata
+     * @return the format-specific count, or {@code 1} if the format is unsupported
+     *         or Word page metadata is unavailable
+     * @throws Exception if the document or its count metadata cannot be read
      */
     public Integer countPages() throws Exception {
         if (DocReaderMSOUtils.isMSWordFile(path)) {
@@ -356,50 +364,53 @@ public class DocReaderMSO {
     }
 
     /**
-     * Calculates the total number of words in the extracted text.
+     * Counts whitespace-separated tokens in the extracted text. Empty text has
+     * a count of zero.
      *
      * @return the word count
-     * @throws Exception if an error occurs
+     * @throws Exception if the document cannot be read or parsed
      */
     public int getWordCount() throws Exception {
         return DocReaderUtils.wordCount(read());
     }
 
     /**
-     * Calculates the total number of characters in the extracted text.
+     * Counts UTF-16 code units in the extracted text, as returned by
+     * {@link String#length()}.
      *
      * @return the character count
-     * @throws Exception if an error occurs
+     * @throws Exception if the document cannot be read or parsed
      */
     public int getCharCount() throws Exception {
         return read().length();
     }
 
     /**
-     * Retrieves the author of the document.
+     * Retrieves the author property from supported Office document metadata.
      *
-     * @return the author, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the author, or {@code null} if the format or property is unsupported
+     * @throws Exception if the document metadata cannot be read
      */
     public String getAuthor() throws Exception {
         return extractPoiStringProperty("author");
     }
 
     /**
-     * Retrieves the title of the document.
+     * Retrieves the title property from supported Office document metadata.
      *
-     * @return the title, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the title, or {@code null} if the format or property is unsupported
+     * @throws Exception if the document metadata cannot be read
      */
     public String getTitle() throws Exception {
         return extractPoiStringProperty("title");
     }
 
     /**
-     * Retrieves the document creation date.
+     * Retrieves the creation date from supported Office metadata, falling back
+     * to the file-system creation time when no metadata date is available.
      *
-     * @return the document metadata creation date, or the file creation date if metadata is unavailable
-     * @throws Exception if an error occurs
+     * @return the metadata or file-system creation date
+     * @throws Exception if the document metadata or file attributes cannot be read
      */
     public Date getCreationDate() throws Exception {
         Object val = extractPoiProperty("creationDate");

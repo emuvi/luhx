@@ -8,16 +8,23 @@ import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-/** Command-line interface for indexing and searching documents. */
+/**
+ * Command-line entry point for indexing and searching documents.
+ *
+ * <p>With no arguments, this class starts {@link LuhxGUI}. Supported commands
+ * are {@code --version}, {@code --index <path>}, and
+ * {@code --search <path> <term>...}.
+ */
 public final class LuhxCMD {
 
     private LuhxCMD() {}
 
     /**
      * Runs the command-line interface, or launches the graphical interface
-     * when no arguments are provided.
+     * when no arguments are provided. Errors are printed to standard error.
      *
-     * @param args command-line arguments
+     * @param args command-line arguments; may be {@code null} or empty to launch
+     *             the GUI
      */
     public static void main(String[] args) {
         configureLogging();

@@ -6,37 +6,41 @@ import java.util.List;
 import org.apache.commons.io.FilenameUtils;
 
 /**
- * Utility class providing file extension matching algorithms to identify 
- * plain text and source code files.
+ * Supported plain-text and source-code file extensions and extension-based
+ * recognition helpers.
  */
 public class DocReaderTXTUtils {
 
-    /** List of supported plaintext file extensions. */
+    /**
+     * Supported plain-text extensions, stored in lowercase without leading
+     * periods. This public array is mutable; changing it changes recognition
+     * results.
+     */
     public static String[] TXT_EXTENSIONS = new String[]{ "txt", "md", "htm", "html", "php", "phtml", "java", "py", "log" };
 
     /**
-     * Checks if the given file has a recognized plaintext extension.
+     * Checks whether the file name has a supported plain-text extension.
      *
      * @param file the file to check
-     * @return true if the file is recognized as a plaintext format
+     * @return {@code true} if the extension is supported; {@code false} otherwise
      */
     public static boolean isTXTFile(File file) {
         return isTXTFile(file.getName());
     }
 
     /**
-     * Checks if the given file name has a recognized plaintext extension.
+     * Checks whether the file name has a supported plain-text extension.
      *
      * @param fileName the name of the file to check
-     * @return true if the file name has a recognized plaintext extension
+     * @return {@code true} if the extension is supported; {@code false} otherwise
      */
     public static boolean isTXTFile(String fileName) {
         return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), TXT_EXTENSIONS);
     }
     /**
-     * Retrieves all registered plaintext extensions.
+     * Returns a list view of the currently supported extensions.
      *
-     * @return a list of all supported plaintext file extensions
+     * @return a fixed-size list backed by {@link #TXT_EXTENSIONS}
      */
     public static List<String> getAllExtensions() {
         return Arrays.asList(TXT_EXTENSIONS);

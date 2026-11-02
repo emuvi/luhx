@@ -6,37 +6,40 @@ import java.util.List;
 import org.apache.commons.io.FilenameUtils;
 
 /**
- * Utility class providing file extension matching algorithms to identify 
- * Portable Document Format (PDF) files.
+ * Supported PDF-related extensions and extension-based recognition helpers.
  */
 public class DocReaderPDFUtils {
 
-    /** List of supported PDF file extensions. */
+    /**
+     * Supported PDF-related extensions, stored in lowercase without leading
+     * periods. This public array is mutable; changing it changes recognition
+     * results.
+     */
     public static String[] PDF_EXTENSIONS = new String[]{ "pdf", "fdf", "xfdf", "pdx", "ppdf" };
 
     /**
-     * Checks if the given file has a recognized PDF extension.
+     * Checks whether the file name has a supported PDF-related extension.
      *
      * @param file the file to check
-     * @return true if the file is recognized as a PDF format
+     * @return {@code true} if the extension is supported; {@code false} otherwise
      */
     public static boolean isPDFFile(File file) {
         return isPDFFile(file.getName());
     }
 
     /**
-     * Checks if the given file name has a recognized PDF extension.
+     * Checks whether the file name has a supported PDF-related extension.
      *
      * @param fileName the name of the file to check
-     * @return true if the file name has a recognized PDF extension
+     * @return {@code true} if the extension is supported; {@code false} otherwise
      */
     public static boolean isPDFFile(String fileName) {
         return UtilsArrays.has(FilenameUtils.getExtension(fileName).toLowerCase(), PDF_EXTENSIONS);
     }
     /**
-     * Retrieves all registered PDF extensions.
+     * Returns a list view of the currently supported extensions.
      *
-     * @return a list of all supported PDF file extensions
+     * @return a fixed-size list backed by {@link #PDF_EXTENSIONS}
      */
     public static List<String> getAllExtensions() {
         return Arrays.asList(PDF_EXTENSIONS);

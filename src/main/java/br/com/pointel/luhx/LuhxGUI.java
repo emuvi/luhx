@@ -28,7 +28,14 @@ import javax.swing.SwingWorker;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 
-/** Swing graphical interface for indexing and searching folders. */
+/**
+ * Swing graphical interface for managing indexed folders and searching their
+ * document contents.
+ *
+ * <p>Folder selections are persisted in {@code paths.ini} in the application's
+ * working directory. Indexing and search operations run off the event-dispatch
+ * thread so the interface remains responsive.
+ */
 public class LuhxGUI extends JFrame {
 
     private static final String PATHS_FILE = "paths.ini";
@@ -39,7 +46,11 @@ public class LuhxGUI extends JFrame {
     private final JTextField searchField = new JTextField();
     private final Set<Path> indexing = new HashSet<>();
 
-    /** Creates the main window. */
+    /**
+     * Creates the main window and loads previously saved folder paths.
+     *
+     * <p>Construct and show this window on the Swing event-dispatch thread.
+     */
     public LuhxGUI() {
         super("Luhx");
         setDefaultCloseOperation(EXIT_ON_CLOSE);
@@ -334,13 +345,20 @@ public class LuhxGUI extends JFrame {
         }
     }
 
-    /** Installs the FlatLaf look and feel and shows the window. */
+    /**
+     * Installs the FlatLaf look and feel and schedules the main window to be
+     * shown on the Swing event-dispatch thread.
+     */
     public static void launch() {
         FlatLightLaf.setup();
         SwingUtilities.invokeLater(() -> new LuhxGUI().setVisible(true));
     }
 
-    /** Launches the graphical interface. */
+    /**
+     * Launches the graphical interface.
+     *
+     * @param args unused command-line arguments
+     */
     public static void main(String[] args) {
         launch();
     }

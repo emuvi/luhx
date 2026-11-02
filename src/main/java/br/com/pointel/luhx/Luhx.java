@@ -28,24 +28,32 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Indexes supported documents in a folder and searches their extracted content.
+ * Indexes supported documents in a folder and searches their extracted text.
  *
- * <p>The index is stored in a {@value #INDEX_DIR_NAME} subdirectory of the
- * indexed folder. Supported files are discovered and read by {@link DocReader}.
+ * <p>Each index is stored in a {@value #INDEX_DIR_NAME} subdirectory of its
+ * source folder. Documents are selected by extension and read by
+ * {@link DocReader}. An indexed file is re-read when its size or last-modified
+ * time changes; changes that preserve both values are not detected.
+ *
+ * <p>Search results use Lucene query syntax, with {@code &}, {@code |}, and
+ * {@code !} accepted as aliases for {@code AND}, {@code OR}, and {@code NOT}
+ * outside quoted phrases.
  */
 public class Luhx {
 
-    /** Name of the hidden directory that stores an index. */
+    /** Name of the subdirectory, relative to the source folder, that stores the index. */
     public static final String INDEX_DIR_NAME = ".luhx";
 
-    /** Base name of the H2 database file that stores an index. */
+    /** Base name of the H2 database file inside {@link #INDEX_DIR_NAME}. */
     public static final String DB_NAME = "index";
 
-    /** Name of the file H2 2.x creates on disk for the database named {@value #DB_NAME}. */
+    /** On-disk filename H2 2.x creates for the database named {@value #DB_NAME}. */
     public static final String DB_FILE_NAME = DB_NAME + ".mv.db";
 
     /**
-     * Counts the files created, updated, removed, or left unchanged in an indexing run.
+     * Counts the successfully created, updated, removed, or unchanged files
+     * processed during one indexing run. Files that failed are reported through
+     * {@link IndexObserver#onError(String, Exception)} and are not included here.
      *
      * @param created   number of new files added to the index
      * @param modified  number of changed files reindexed
@@ -55,41 +63,84 @@ public class Luhx {
     public record IndexStats(int created, int modified, int deleted, int unchanged) {}
 
     /**
-     * A file matched by a search, together with its path and relevance score.
+     * A file matched by a search, represented by its resolved path, index-relative
+     * path, and Lucene relevance score.
      *
-     * @param file         normalized path to the matched file
-     * @param relativePath path relative to the indexed folder, using forward slashes
-     * @param score        relevance score calculated by Lucene's BM25 similarity
+     * @param file         absolute, normalized path resolved from the indexed folder
+     * @param relativePath path relative to the indexed folder, with forward slashes
+     * @param score        Lucene BM25 score; larger values rank higher for the same query
      */
     public record SearchResult(Path file, String relativePath, float score) {}
 
-    /** The outcome of processing one file during indexing. */
-    public enum IndexAction { CREATED, MODIFIED, DELETED, UNCHANGED, FAILED }
+    /** Outcome reported for a file processed during indexing. */
+    public enum IndexAction {
+        /** A new supported file was added to the index. */
+        CREATED,
+        /** A supported file whose size or modification time changed was reindexed. */
+        MODIFIED,
+        /** An index entry was removed because the file was no longer present. */
+        DELETED,
+        /** The file matched its indexed size and modification time and was not re-read. */
+        UNCHANGED,
+        /** The file could not be indexed; processing continues with other files. */
+        FAILED
+    }
 
     /**
-     * Observes the progress of an indexing run. All methods are optional and are
-     * called one at a time (never concurrently), but files are processed by a pool
-     * of worker threads, so {@code onFile} may run on any of them and in any order.
-     * Implementations should return quickly.
+     * Observes the progress of an indexing run. All methods have default
+     * implementations and may be overridden as needed.
+     *
+     * <p>File parsing uses worker threads. Progress events are serialized, but
+     * {@code onFile} and {@code onError} may be invoked from a worker thread and
+     * in an order unrelated to the folder traversal. Implementations should
+     * return promptly and should not assume callbacks run on the Swing event thread.
      */
     public interface IndexObserver {
 
-        /** Called once before scanning starts. */
+        /**
+         * Called once before the folder is scanned.
+         *
+         * @param folder absolute, normalized source folder
+         */
         default void onStart(Path folder) {}
 
-        /** Called after each file is processed (or removed from the index). */
+        /**
+         * Called after a supported file is processed or an obsolete entry is removed.
+         *
+         * @param relativePath file path relative to the source folder, using forward slashes
+         * @param action processing outcome
+         */
         default void onFile(String relativePath, IndexAction action) {}
 
-        /** Called when a file fails to index; the run continues with other files. */
+        /**
+         * Called when one file cannot be indexed; the run continues with other files.
+         *
+         * @param relativePath file path relative to the source folder
+         * @param error cause of the indexing failure
+         */
         default void onError(String relativePath, Exception error) {}
 
-        /** Called once after the run completes, including runs with per-file failures. */
+        /**
+         * Called once when indexing completes normally, including runs with
+         * per-file failures.
+         *
+         * @param stats successfully processed file counts
+         */
         default void onFinish(IndexStats stats) {}
 
-        /** Polled between files; return true to stop the run early. */
+        /**
+         * Polled during scanning and before processing files.
+         *
+         * @return {@code true} to stop early; the current run's changes are retained
+         */
         default boolean isCancelled() { return false; }
 
-        /** Called once when the run stopped early; stats cover the files processed so far. */
+        /**
+         * Called once after an early stop. Unvisited files are not treated as
+         * deleted, and already processed changes remain in the index.
+         *
+         * @param stats successfully processed file counts at cancellation
+         */
         default void onCancel(IndexStats stats) {}
     }
 
@@ -97,7 +148,11 @@ public class Luhx {
 
     private record DocMeta(long id, String filePath, long lastModified, long fileSize) {}
 
-    /** Launches the application through its command-line entry point. */
+    /**
+     * Launches the command-line application (or the GUI when no arguments are supplied).
+     *
+     * @param args command-line arguments; see {@link LuhxCMD}
+     */
     public static void main(String[] args) {
         LuhxCMD.main(args);
     }
@@ -138,12 +193,14 @@ public class Luhx {
      * <p>Supported files are scanned recursively, excluding the index directory.
      * New files are indexed, files whose size or modification time changed are
      * reindexed, and entries for files that are no longer present are removed.
+     * If a file fails, the error is reported to standard error and processing
+     * continues; failures are not represented in the returned statistics.
      *
      * @param folderPath folder to index
      * @return counts of created, modified, deleted, and unchanged files
      * @throws IllegalArgumentException if {@code folderPath} is null, does not exist,
      *                                  or is not a directory
-     * @throws Exception if the index cannot be created or updated
+     * @throws Exception if the folder cannot be scanned or the index cannot be created or updated
      */
     public static IndexStats indexFolder(Path folderPath) throws Exception {
         return indexFolder(folderPath, null);
@@ -151,10 +208,16 @@ public class Luhx {
 
     /**
      * Creates or updates the index for a folder, reporting progress to an observer.
+     * The index is committed periodically and once at the end; if the observer
+     * requests cancellation, processed changes are retained and unseen files are
+     * not removed.
      *
      * @param folderPath folder to index
-     * @param observer   receives progress events; may be null
+     * @param observer   receives progress events; may be {@code null}
      * @return counts of created, modified, deleted, and unchanged files
+     * @throws IllegalArgumentException if {@code folderPath} is null, does not exist,
+     *                                  or is not a directory
+     * @throws Exception if the folder cannot be scanned or the index cannot be created or updated
      * @see #indexFolder(Path)
      */
     public static IndexStats indexFolder(Path folderPath, IndexObserver observer) throws Exception {
@@ -427,12 +490,15 @@ public class Luhx {
      *
      * <p>Results are ordered by descending BM25 score, with relative paths used
      * to break ties. When multiple non-empty terms are supplied without Boolean
-     * operators, they are joined with {@code AND}. An absent index or an empty
-     * query produces an empty list.
+     * operators, they are joined with {@code AND}. Shorthand Boolean operators
+     * are normalized outside quoted text. An absent index, null/blank-only
+     * terms, or an empty query produces an empty list.
      *
      * @param folderPath folder containing the index
-     * @param keys search terms or a Lucene query, optionally including Boolean operators
-     * @return matching files, or an empty list if no index or query is available
+     * @param keys search terms or a Lucene query; separate ordinary terms are
+     *             combined with {@code AND}, and null/blank entries are ignored
+     * @return all matching files ordered by relevance, or an empty list if no
+     *         index or usable query is available
      * @throws IllegalArgumentException if {@code folderPath} is null
      * @throws Exception if the index cannot be opened or the query cannot be executed
      */
@@ -442,12 +508,13 @@ public class Luhx {
 
     /**
      * Searches a page of results from the index associated with a folder.
+     * Ordering and query handling are the same as for {@link #searchFolder(Path, String...)}.
      *
      * @param folderPath folder containing the index
-     * @param offset number of highest-ranked results to skip
-     * @param limit maximum number of results to return
+     * @param offset number of highest-ranked results to skip; zero starts at the top
+     * @param limit maximum number of results to return; must be positive
      * @param keys search terms or a Lucene query, optionally including Boolean operators
-     * @return matching files for the requested page, ordered by relevance
+     * @return at most {@code limit} matching files for this page, ordered by relevance
      * @throws IllegalArgumentException if {@code folderPath} is null, {@code offset}
      *                                  is negative, or {@code limit} is not positive
      * @throws Exception if the index cannot be opened or the query cannot be executed

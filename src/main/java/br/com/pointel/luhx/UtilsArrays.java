@@ -1,7 +1,7 @@
 package br.com.pointel.luhx;
 
 /**
- * Provides small utility operations for arrays.
+ * Small, null-tolerant utility operations for arrays.
  */
 public class UtilsArrays {
 

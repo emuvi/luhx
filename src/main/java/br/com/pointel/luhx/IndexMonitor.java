@@ -16,7 +16,12 @@ import javax.swing.JProgressBar;
 import javax.swing.JScrollPane;
 import javax.swing.SwingUtilities;
 
-/** Non-modal window that shows the live progress of an indexing run. */
+/**
+ * Non-modal Swing window that displays the progress and outcome of an indexing run.
+ *
+ * <p>Observer callbacks update this window on the Swing event-dispatch thread.
+ * Use the Stop button to request cancellation; completed changes are retained.
+ */
 public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
 
     private final DefaultListModel<String> log = new DefaultListModel<>();
@@ -29,7 +34,9 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
     private int created, modified, deleted, unchanged, failed;
 
     /**
-     * Creates the monitor for a folder.
+     * Creates a monitor for an indexing run. The caller should show the window
+     * on the Swing event-dispatch thread and pass this instance as the
+     * {@link Luhx.IndexObserver}.
      *
      * @param owner  parent window
      * @param folder folder being indexed
@@ -84,21 +91,25 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
         append(message);
     }
 
+    /** {@inheritDoc} */
     @Override
     public boolean isCancelled() {
         return cancelRequested;
     }
 
+    /** {@inheritDoc} */
     @Override
     public void onCancel(Luhx.IndexStats stats) {
         SwingUtilities.invokeLater(() -> finished("Stopped by user. Files processed so far were kept in the index."));
     }
 
+    /** {@inheritDoc} */
     @Override
     public void onStart(Path folder) {
         SwingUtilities.invokeLater(() -> append("Started: " + folder));
     }
 
+    /** {@inheritDoc} */
     @Override
     public void onFile(String relativePath, Luhx.IndexAction action) {
         SwingUtilities.invokeLater(() -> {
@@ -116,6 +127,7 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
         });
     }
 
+    /** {@inheritDoc} */
     @Override
     public void onError(String relativePath, Exception error) {
         SwingUtilities.invokeLater(() -> {
@@ -124,12 +136,16 @@ public class IndexMonitor extends JFrame implements Luhx.IndexObserver {
         });
     }
 
+    /** {@inheritDoc} */
     @Override
     public void onFinish(Luhx.IndexStats stats) {
         SwingUtilities.invokeLater(() -> finished("Finished."));
     }
 
-    /** Re-enables closing if the run ended without a finish or error event. */
+    /**
+     * Enables closing and disables cancellation after the background worker
+     * has ended, including when it failed before delivering a completion event.
+     */
     public void ended() {
         SwingUtilities.invokeLater(() -> {
             bar.setIndeterminate(false);

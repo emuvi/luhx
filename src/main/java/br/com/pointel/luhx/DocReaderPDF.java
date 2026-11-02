@@ -17,17 +17,20 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.text.PDFTextStripper;
 
 /**
- * A specialized document reader that extracts text, page counts, and images from PDFs.
- * It leverages the Apache PDFBox library to perform deep text extraction, including 
- * parsing and formatting embedded PDF annotations/comments.
+ * Extracts text, metadata, page counts, and page images from PDF files using
+ * Apache PDFBox.
+ *
+ * <p>Extracted page text includes non-blank annotation contents. This class
+ * recognizes files by extension; PDF validity is checked when an operation
+ * opens the document.
  */
 public class DocReaderPDF {
     
     /**
-     * Checks if the file is a supported PDF format.
+     * Checks whether the file name has an extension recognized as PDF.
      *
      * @param file the file to check
-     * @return true if the file is a PDF
+     * @return {@code true} if the extension is recognized; {@code false} otherwise
      */
     public static boolean canRead(File file) {
         return DocReaderPDFUtils.isPDFFile(file);
@@ -37,20 +40,21 @@ public class DocReaderPDF {
     private final File file;
 
     /**
-     * Constructs a reader for a PDF document.
+     * Creates a reader for a PDF file.
      *
-     * @param file the file to read
+     * @param file file to read; must not be {@code null}
      */
     public DocReaderPDF(File file) {
         this.file = file;
     }
 
     /**
-     * Extracts the text from all pages in the document.
-     * Pages are separated by "---" markers in the resulting string.
+     * Extracts text from all pages in page order, including non-blank annotation
+     * contents. Adjacent page texts are separated by a line containing
+     * {@code ---}.
      *
      * @return the combined extracted text
-     * @throws Exception if an error occurs reading the PDF
+     * @throws Exception if the PDF cannot be opened or read
      */
     public String read() throws Exception {
         // Temp-file buffering keeps large PDFs out of the heap during bulk indexing.
@@ -71,10 +75,10 @@ public class DocReaderPDF {
     }
 
     /**
-     * Obtains the total number of physical pages in the PDF.
+     * Returns the number of pages in the PDF.
      *
      * @return the total page count
-     * @throws Exception if an error occurs reading the PDF metadata
+     * @throws Exception if the PDF cannot be opened or its page tree cannot be read
      */
     public Integer countPages() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -83,12 +87,12 @@ public class DocReaderPDF {
     }
 
     /**
-     * Extracts the text content from a single specific page.
+     * Extracts text and non-blank annotation contents from one page.
      *
-     * @param pageNumber the zero-based index of the page
-     * @return the extracted text of the page
-     * @throws Exception if the page is out of bounds or reading fails
-     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
+     * @param pageNumber zero-based page index
+     * @return extracted text and annotation contents, if any
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document
+     * @throws Exception if the PDF cannot be opened or the page cannot be read
      */
     public String readPage(int pageNumber) throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -97,14 +101,14 @@ public class DocReaderPDF {
     }
 
     /**
-     * Core static logic for parsing text and annotations from a loaded PDF page.
-     * Appends any found PDF annotations/comments to the bottom of the page text.
+     * Extracts text and non-blank annotation contents from a page in an already
+     * loaded document. Annotation contents are appended after the page text.
      *
-     * @param doc        the loaded PDDocument object
-     * @param pageNumber the zero-based index of the page
-     * @return the text and annotations combined
-     * @throws IOException if an error occurs extracting the data
-     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
+     * @param doc        open PDF document; ownership remains with the caller
+     * @param pageNumber zero-based page index
+     * @return extracted page text followed by annotation contents, if present
+     * @throws IOException if PDFBox cannot read page text or annotations
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document
      */
     public static String readPage(PDDocument doc, int pageNumber) throws IOException {
         int numPages = doc.getNumberOfPages();
@@ -144,13 +148,13 @@ public class DocReaderPDF {
     }
 
     /**
-     * Renders a specific page into a standard BufferedImage raster.
+     * Renders a page to an RGB image at the requested resolution.
      *
-     * @param pageNumber the zero-based index of the page
-     * @param dpi        the resolution (Dots Per Inch) to render the image at
-     * @return the rendered image
-     * @throws Exception if an error occurs reading the PDF or rendering the page
-     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
+     * @param pageNumber zero-based page index
+     * @param dpi        rendering resolution in dots per inch
+     * @return rendered page image
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document
+     * @throws Exception if the PDF cannot be opened or rendered
      */
     public BufferedImage getPageAsImage(int pageNumber, int dpi) throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -163,21 +167,22 @@ public class DocReaderPDF {
         }
     }
     /**
-     * Reads all lines from the document text.
+     * Reads all extracted page text and splits it at line-feed boundaries.
      *
-     * @return a list containing all lines
-     * @throws Exception if an error occurs
+     * @return extracted lines in document order
+     * @throws Exception if the PDF cannot be read
      */
     public List<String> readLines() throws Exception {
         return Arrays.asList(read().split("\\r?\\n"));
     }
 
     /**
-     * Reads a preview of the document contents up to the given length.
+     * Returns at most the requested number of leading characters from the
+     * extracted document text.
      *
      * @param length the maximum number of characters to return; must not be negative
      * @return up to {@code length} characters
-     * @throws Exception if an error occurs
+     * @throws Exception if the PDF cannot be read
      * @throws IndexOutOfBoundsException if {@code length} is negative
      */
     public String readPreview(int length) throws Exception {
@@ -185,30 +190,32 @@ public class DocReaderPDF {
     }
 
     /**
-     * Calculates the total number of words in the extracted text.
+     * Counts whitespace-separated tokens in the extracted text. An empty
+     * document has a count of zero.
      *
      * @return the word count
-     * @throws Exception if an error occurs
+     * @throws Exception if the PDF cannot be read
      */
     public int getWordCount() throws Exception {
         return DocReaderUtils.wordCount(read());
     }
 
     /**
-     * Calculates the total number of characters in the extracted text.
+     * Counts UTF-16 code units in the extracted text, as returned by
+     * {@link String#length()}.
      *
      * @return the character count
-     * @throws Exception if an error occurs
+     * @throws Exception if the PDF cannot be read
      */
     public int getCharCount() throws Exception {
         return read().length();
     }
 
     /**
-     * Retrieves the author of the document.
+     * Retrieves the author field from the PDF document information dictionary.
      *
-     * @return the author, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the author, or {@code null} if the field is absent
+     * @throws Exception if the PDF cannot be opened or its metadata cannot be read
      */
     public String getAuthor() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -218,10 +225,10 @@ public class DocReaderPDF {
     }
 
     /**
-     * Retrieves the title of the document.
+     * Retrieves the title field from the PDF document information dictionary.
      *
-     * @return the title, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the title, or {@code null} if the field is absent
+     * @throws Exception if the PDF cannot be opened or its metadata cannot be read
      */
     public String getTitle() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -231,10 +238,10 @@ public class DocReaderPDF {
     }
 
     /**
-     * Retrieves the subject of the document.
+     * Retrieves the subject field from the PDF document information dictionary.
      *
-     * @return the subject, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the subject, or {@code null} if the field is absent
+     * @throws Exception if the PDF cannot be opened or its metadata cannot be read
      */
     public String getSubject() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -244,10 +251,10 @@ public class DocReaderPDF {
     }
 
     /**
-     * Retrieves the creator of the document.
+     * Retrieves the creator field from the PDF document information dictionary.
      *
-     * @return the creator, or null if unavailable
-     * @throws Exception if an error occurs
+     * @return the creator, or {@code null} if the field is absent
+     * @throws Exception if the PDF cannot be opened or its metadata cannot be read
      */
     public String getCreator() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -257,10 +264,11 @@ public class DocReaderPDF {
     }
 
     /**
-     * Retrieves the document creation date.
+     * Retrieves the PDF metadata creation date, falling back to the file-system
+     * creation time when the metadata date is absent.
      *
-     * @return the creation date from PDF metadata, or the file creation date if metadata is unavailable
-     * @throws Exception if an error occurs
+     * @return the metadata or file-system creation date
+     * @throws Exception if the PDF or required file attributes cannot be read
      */
     public Date getCreationDate() throws Exception {
         try (var doc = PDDocument.load(file)) {
@@ -274,12 +282,14 @@ public class DocReaderPDF {
     }
 
     /**
-     * Extracts images directly referenced by a page's image XObjects.
+     * Extracts image XObjects directly referenced by the page resources. Images
+     * nested inside other XObjects or painted as inline image operators are not
+     * included.
      *
-     * @param pageNumber the zero-based index of the page
-     * @return the images found in the page resources
-     * @throws Exception if an error occurs reading the PDF or extracting an image
-     * @throws IllegalArgumentException if {@code pageNumber} is outside the document's page range
+     * @param pageNumber zero-based page index
+     * @return images encountered in the page's resources, in resource iteration order
+     * @throws IllegalArgumentException if {@code pageNumber} is outside the document
+     * @throws Exception if the PDF or an image cannot be read
      */
     public List<BufferedImage> getImages(int pageNumber) throws Exception {
         var images = new ArrayList<BufferedImage>();
