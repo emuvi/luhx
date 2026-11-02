@@ -34,6 +34,15 @@ public final class LuhxCMD {
     }
 
     private static void run(String[] args) throws Exception {
+        if ("--version".equals(args[0])) {
+            if (args.length != 1) {
+                printUsage();
+                return;
+            }
+            printVersion();
+            return;
+        }
+
         if (args.length < 2) {
             printUsage();
             return;
@@ -99,8 +108,14 @@ public final class LuhxCMD {
         System.setProperty("org.apache.commons.logging.Log", "org.apache.commons.logging.impl.NoOpLog");
     }
 
+    private static void printVersion() {
+        String version = LuhxCMD.class.getPackage().getImplementationVersion();
+        System.out.println("Luhx " + (version == null ? "development" : version));
+    }
+
     private static void printUsage() {
         System.out.println("Usage:");
+        System.out.println("  --version                  Prints the application version");
         System.out.println("  --index <path>             Creates or updates the folder index");
         System.out.println("  --search <path> <keys>...  Searches the folder index for the given terms");
     }

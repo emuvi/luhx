@@ -49,6 +49,12 @@ a Javadoc JAR when building with `mvn package`.
 
 Both commands take the folder to index or search. The index is stored in a `.luhx` subfolder inside it.
 
+### Print the version
+
+```shell
+java -jar dist/luhx.jar --version
+```
+
 ### Create or update an index
 
 ```shell
