@@ -73,6 +73,13 @@ final class WindowConfig {
         trackingInstalled = true;
     }
 
+    private static void applyIcon(Window window) {
+        java.net.URL url = WindowConfig.class.getResource("/luhx.png");
+        if (url != null) {
+            window.setIconImage(Toolkit.getDefaultToolkit().getImage(url));
+        }
+    }
+
     private static void registerWindow(Window window, String windowId, Window positioningOwner) {
         synchronized (TRACKED_WINDOWS) {
             if (TRACKED_WINDOWS.containsKey(window)) {
@@ -80,6 +87,7 @@ final class WindowConfig {
             }
             TRACKED_WINDOWS.put(window, windowId);
         }
+        applyIcon(window);
 
         window.addWindowListener(new java.awt.event.WindowAdapter() {
             @Override
