@@ -172,6 +172,7 @@ public class Luhx {
         obs.onStart(normalizedFolder);
         try (Connection conn = DriverManager.getConnection(getJdbcUrl(normalizedFolder))) {
             initDatabase(conn);
+            conn.setAutoCommit(false);
 
             Map<String, DocMeta> existingDocs = loadExistingDocs(conn);
             Set<String> seenPaths = new HashSet<>();
@@ -218,7 +219,8 @@ public class Luhx {
                 });
 
                 if (!cancelled[0]) {
-                    int threads = Math.max(1, Math.min(Runtime.getRuntime().availableProcessors(),
+                    // Capped because each worker holds a whole document's text in memory.
+                    int threads = Math.max(1, Math.min(Math.min(Runtime.getRuntime().availableProcessors(), 4),
                             Math.max(1, found.size())));
                     ExecutorService pool = Executors.newFixedThreadPool(threads);
                     Object lock = new Object();
@@ -250,6 +252,7 @@ public class Luhx {
                                             insertStmt.setString(5, content);
                                             insertStmt.executeUpdate();
                                             counts[0]++;
+                                            flushIfNeeded(conn, counts);
                                             obs.onFile(relPath, IndexAction.CREATED);
                                         } else if (changed) {
                                             updateStmt.setString(1, file.getName());
@@ -259,6 +262,7 @@ public class Luhx {
                                             updateStmt.setLong(5, existing.id());
                                             updateStmt.executeUpdate();
                                             counts[1]++;
+                                            flushIfNeeded(conn, counts);
                                             obs.onFile(relPath, IndexAction.MODIFIED);
                                         } else {
                                             counts[3]++;
@@ -301,6 +305,10 @@ public class Luhx {
                 }
             }
 
+            conn.commit();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CHECKPOINT SYNC");
+            }
             IndexStats stats = new IndexStats(counts[0], counts[1], counts[2], counts[3]);
             if (cancelled[0]) {
                 obs.onCancel(stats);
@@ -308,6 +316,19 @@ public class Luhx {
                 obs.onFinish(stats);
             }
             return stats;
+        }
+    }
+
+    private static final int FLUSH_EVERY = 100;
+
+    // Commits and checkpoints periodically so pending changes and the full-text index reach disk
+    // instead of accumulating in memory. Callers must hold the index lock.
+    private static void flushIfNeeded(Connection conn, int[] counts) throws SQLException {
+        if ((counts[0] + counts[1]) % FLUSH_EVERY == 0) {
+            conn.commit();
+            try (Statement stmt = conn.createStatement()) {
+                stmt.execute("CHECKPOINT SYNC");
+            }
         }
     }
 

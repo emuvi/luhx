@@ -10,6 +10,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.io.MemoryUsageSetting;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.rendering.PDFRenderer;
@@ -52,7 +53,8 @@ public class DocReaderPDF {
      * @throws Exception if an error occurs reading the PDF
      */
     public String read() throws Exception {
-        try (var doc = PDDocument.load(file)) {
+        // Temp-file buffering keeps large PDFs out of the heap during bulk indexing.
+        try (var doc = PDDocument.load(file, MemoryUsageSetting.setupTempFileOnly())) {
             var count = doc.getNumberOfPages();
             var builder = new StringBuilder();
             for (int i = 0; i < count; i++) {
