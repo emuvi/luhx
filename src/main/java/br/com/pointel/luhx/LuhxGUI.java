@@ -46,7 +46,7 @@ public class LuhxGUI extends JFrame {
 
         JButton add = new JButton("+");
         JButton remove = new JButton("-");
-        JButton index = new JButton("Index");
+        JButton index = new JButton("#");
         JButton search = new JButton("Search");
         add.addActionListener(e -> addFolder());
         remove.addActionListener(e -> removeSelected());
