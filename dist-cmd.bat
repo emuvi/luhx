@@ -5,7 +5,7 @@ cd /d "%~dp0"
 rem Builds a self-contained command-line Luhx distribution.
 rem Requires JDK 21+ (java, jlink, jpackage) and Maven in the PATH.
 
-set "NAME=Luhx"
+set "NAME=luhx"
 set "MAIN_CLASS=br.com.pointel.luhx.LuhxCMD"
 set "DIST=%~dp0dist"
 set "PACKAGE=%DIST%\cmd"
